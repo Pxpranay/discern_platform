@@ -172,6 +172,16 @@ class StockMove(AppendOnlyModel):
     """
 
     item = models.ForeignKey("core.Item", on_delete=models.PROTECT, related_name="moves")
+    #: Which BOQ line this movement satisfies, where it satisfies one. Lets
+    #: reconciliation tell "ordered but not delivered" from "already received",
+    #: which are routed differently (process design §4.5).
+    boq_line = models.ForeignKey(
+        "core.BoqLine",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="stock_moves",
+    )
     from_location = models.ForeignKey(
         "core.Location",
         on_delete=models.PROTECT,

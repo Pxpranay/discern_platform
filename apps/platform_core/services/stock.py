@@ -24,9 +24,11 @@ def post_move(
     to_location_id: int | None = None,
     unit_value: Decimal | None = None,
     effective_at=None,
+    boq_line_id: int | None = None,
 ) -> StockMove:
     return StockMove.objects.create(
         item_id=item_id,
+        boq_line_id=boq_line_id,
         from_location_id=from_location_id,
         to_location_id=to_location_id,
         quantity=Decimal(quantity),

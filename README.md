@@ -6,7 +6,7 @@ Integrated operations platform for Discern Engineering Pvt Ltd — a purpose-bui
 Enquiry → Sales → Project → BOQ → Procurement → Fabrication / Subcontract → Receipt → Costing
 ```
 
-**Status: design under review. Phases 0 and 1 built and tested — 97 tests passing.**
+**Status: design under review. Phases 0, 1 and 2 built and tested — 131 tests passing.**
 
 ---
 
@@ -69,7 +69,7 @@ Requires Docker, or a local PostgreSQL 16 and Redis.
 cp .env.example .env
 docker compose up --build      # or: make up
 make migrate
-make test                      # 97 tests
+make test                      # 131 tests
 make test-ceiling              # just the invariant the design rests on
 ```
 
@@ -131,9 +131,44 @@ model document carried that error and has been corrected.
 
 ---
 
+## What is built: Phase 2 — BOQ and the ceiling
+
+| Module | Covers |
+|---|---|
+| **Engineering** (`apps/engineering`) | BOQ revisions, discipline-owned sections, section sign-off, PM release, the reconciliation engine, and an importer for Discern's own spreadsheet format |
+
+**One revision, two sections.** The Design Manager signs off Goods, the
+Construction Manager signs off Service, and either may be marked *not
+applicable* when the project has no such scope — which is what stops a
+materials-only project deadlocking on a signature nobody can give. Release is
+the PM's single approval, and it locks the revision.
+
+**The reconciliation engine** is the highest-risk item in the build plan. It
+computes the net change per line against the **commitment and stock ledgers**,
+not against the previous revision's text — because what the engineer changed
+and what still needs doing are different numbers the moment an order is in
+flight. Six outcomes, routed separately: request the delta, quietly reduce a
+draft, amend an outstanding order, or queue a return.
+
+It is tested against **Discern's real BOQ revisions** (`tests/fixtures/`) —
+the LINAC Building fire protection Rev 0 and Rev 1. Using real documents rather
+than synthetic ones surfaced three things worth having found:
+
+- A description typed inconsistently within one nine-line table
+  (`100 mm Nb` vs `80 mm NB`). Raw string matching would have read that as a
+  deleted line plus an unrelated new one — a spurious return *and* a spurious
+  purchase for a line nobody touched. Matching is normalised.
+- Removals expressed as **quantity 0** with the row kept, not as deleted rows.
+- New lines appended at the end so SL numbers stay stable.
+
+`BoqLine.item` is nullable as a direct result: the real documents carry
+SL NO / DESCRIPTION / UNIT / QTY, with no item-master reference and **no rate**.
+
+---
+
 ### Test coverage of the invariants
 
-97 tests, all passing against real PostgreSQL, and verified order-independent.
+131 tests, all passing against real PostgreSQL, and verified order-independent.
 The ones that matter:
 
 - **Property-based ceiling tests** — 150 randomized sequences of reserve,
@@ -153,6 +188,9 @@ The ones that matter:
   mandatory client agreement.
 - **Per-lot margin tests** showing an order with two SITC lots reporting two
   margins rather than one blended figure.
+- **Reconciliation tests against real BOQ revisions**, covering all six
+  outcomes — including a partial receipt that splits one line into a return of
+  what arrived and a cancellation of what had not yet shipped.
 
 ---
 
@@ -160,7 +198,7 @@ The ones that matter:
 
 1. **Review the design** — start with the Process Design document.
 2. **Settle the 8 blocking decisions** in the [Decisions Register](docs/05-decisions.md#tier-1--blocking-these-change-the-schema). Decisions #1 (wastage tolerance) and #2 (PM ceiling override) are implemented to the recommended defaults; changing them is configuration, not rework.
-3. **Phase 2** — BOQ and the ceiling: revisions, discipline-owned sections, section sign-off, PM release, and the reconciliation engine. The build plan flags the reconciliation diff as the highest-risk item in the whole build; it wants real historical BOQ revisions from Discern to test against, not synthetic data.
+3. **Phase 3** — Procurement and receipt: vendors, procurement requests from all three sources, cross-location stock availability, RFQ to three vendors, the comparison statement, discretionary award, purchase orders against the ceiling, and Site Engineer verification before cost is accepted.
 
 ---
 

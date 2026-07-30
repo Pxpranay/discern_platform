@@ -3,6 +3,7 @@ psycopg2-binary>=2.9
 celery>=5.4
 redis>=5.0
 djangorestframework>=3.15
+openpyxl>=3.1
 
 # Development and test
 pytest>=8.0

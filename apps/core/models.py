@@ -171,12 +171,18 @@ class Location(models.Model):
 
 
 class BoqLine(models.Model):
-    """Phase 0 stub of the BOQ line the quantity ceiling is enforced against.
+    """One line of a BOQ revision — the thing the quantity ceiling is enforced against.
 
-    Phase 2 adds the revision, section, lot and route. The ceiling only needs
-    the project, the item and the authorized quantity, so the commitment ledger
-    and its property tests can be built and proven now — which is the point of
-    building the platform foundations first (build plan §2).
+    ``item`` is nullable on purpose. Discern's real BOQ documents carry
+    SL NO, DESCRIPTION, UNIT and QTY, with no reference to an item master and
+    no rate. A line can therefore exist as free text before anyone maps it to a
+    catalogue item; the mapping is what later enables vendor grouping in
+    procurement, so it is worth having but cannot be a precondition for writing
+    a BOQ.
+
+    ``previous_line`` carries identity across revisions. Without it, a re-typed
+    description reads to the diff as "old line deleted, new line added" and
+    produces both a spurious return and a spurious purchase.
     """
 
     SUPPLY = "SUPPLY"
@@ -185,16 +191,54 @@ class BoqLine(models.Model):
     ROUTE_CHOICES = [(SUPPLY, "Supply"), (FABRICATE, "Fabricate"), (SERVICE, "Service")]
 
     project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name="boq_lines")
-    item = models.ForeignKey(Item, on_delete=models.PROTECT, related_name="boq_lines")
+    section = models.ForeignKey(
+        "engineering.BoqSection",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="lines",
+    )
+    lot = models.ForeignKey(
+        "sales.Lot",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="boq_lines",
+    )
+    item = models.ForeignKey(
+        Item,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="boq_lines",
+    )
+
+    sl_no = models.CharField(max_length=32, blank=True)
     description = models.TextField(blank=True)
     quantity = models.DecimalField(
         max_digits=18, decimal_places=4, validators=[MinValueValidator(Decimal("0"))]
     )
     uom = models.CharField(max_length=32, default="nos")
     route = models.CharField(max_length=16, choices=ROUTE_CHOICES, default=SUPPLY)
+    drawing_reference = models.CharField(max_length=128, blank=True)
+    notes = models.TextField(blank=True)
+
+    previous_line = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="next_lines"
+    )
 
     class Meta:
         db_table = "boq_line"
 
     def __str__(self) -> str:
-        return f"BOQ line {self.pk}: {self.quantity} {self.uom} of {self.item_id}"
+        return f"BOQ line {self.pk}: {self.quantity} {self.uom} — {self.description[:40]}"
+
+    @property
+    def is_removed(self) -> bool:
+        """A zeroed line means removed.
+
+        Discern's own revisions keep the row and set QTY to 0 rather than
+        deleting it, which keeps SL numbers stable across revisions. Treating
+        zero as removal matches how the documents are actually written.
+        """
+        return self.quantity == 0

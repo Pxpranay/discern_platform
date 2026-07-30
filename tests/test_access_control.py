@@ -276,3 +276,58 @@ class AdminScreenTests(TestCase):
             ("user_list", []),
         ]:
             self.assertEqual(http.get(reverse(name, args=args)).status_code, 403, name)
+
+
+class CeoApprovalRoutingTests(TestCase):
+    """Discern's instruction: at this stage every final sign-off routes to the CEO.
+
+    "Final" means the last signature before something is committed, ordered,
+    released or paid. Preparing work stays with the people who do it — only the
+    approval moved.
+    """
+
+    def _role(self, code):
+        return dict((c, caps) for c, _, caps in DEFAULT_ROLES)[code]
+
+    def test_the_ceo_holds_every_final_approval(self):
+        from apps.accounts.capabilities import FINAL_APPROVALS
+
+        ceo = set(self._role("ceo"))
+        self.assertEqual(set(FINAL_APPROVALS) - ceo, set())
+
+    def test_no_other_role_holds_a_final_approval(self):
+        """Otherwise the routing would be advisory rather than real."""
+        from apps.accounts.capabilities import FINAL_APPROVALS
+
+        for code, _, caps in DEFAULT_ROLES:
+            if code in ("ceo", "administrator"):
+                continue
+            leaked = set(caps) & set(FINAL_APPROVALS)
+            self.assertEqual(leaked, set(), f"{code} still holds {leaked}")
+
+    def test_the_roles_that_prepare_the_work_keep_their_own_capabilities(self):
+        """Centralising approval must not stop anyone doing their job."""
+        self.assertIn("order:confirm", self._role("sales_manager"))
+        self.assertIn("boq:sign_off", self._role("design_manager"))
+        self.assertIn("procurement:award", self._role("purchase_manager"))
+        self.assertIn("project:plan_schedule", self._role("project_manager"))
+        self.assertIn("receipt:verify", self._role("site_engineer"))
+
+    def test_the_ceo_can_also_hold_administrator(self):
+        """Discern's choice. Roles compose, so this needs no special case."""
+        ceo = user_with(*self._role("ceo"), is_administrator=True)
+        self.assertTrue(ceo.has_capability("boq_revision:release"))
+        self.assertTrue(ceo.has_capability("admin:manage"))
+
+    def test_a_project_manager_can_no_longer_release_a_boq(self):
+        http = signed_in(user_with(*self._role("project_manager")))
+        self.assertEqual(http.get(reverse("boq_list")).status_code, 200)
+        person = user_with(*self._role("project_manager"))
+        self.assertFalse(person.has_capability("boq_revision:release"))
+
+    def test_a_purchase_manager_still_awards_but_no_longer_approves(self):
+        """The award was always theirs and stays theirs; the second signature
+        above the value threshold is now the CEO's."""
+        person = user_with(*self._role("purchase_manager"))
+        self.assertTrue(person.has_capability("procurement:award"))
+        self.assertFalse(person.has_capability("purchase_order:approve"))

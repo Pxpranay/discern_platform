@@ -6,7 +6,7 @@ Integrated operations platform for Discern Engineering Pvt Ltd — a purpose-bui
 Enquiry → Sales → Project → BOQ → Procurement → Fabrication / Subcontract → Receipt → Costing
 ```
 
-**Status: all six phases of the build plan implemented. 258 tests passing. Sign in with `demo` / `discern2026`; site screens at `/m/`.**
+**Status: all six phases of the build plan implemented. 264 tests passing. Runs locally — not yet deployed. Sign in with `demo` / `discern2026`; site screens at `/m/`.**
 
 ---
 
@@ -74,7 +74,7 @@ make seed                      # demo login + a worked project from the real BOQ
 make run                       # http://localhost:8000  —  demo / discern2026
 ```
 
-Other targets: `make test` (258 tests), `make test-ceiling` (just the
+Other targets: `make test` (264 tests), `make test-ceiling` (just the
 invariant the design rests on), `make demo` (terminal walkthrough).
 
 ### Screens
@@ -107,7 +107,13 @@ or more roles. Permissions come in two kinds:
   Confirming an order and approving it for kickoff are separate permissions, so
   one person preparing an order cannot wave it through alone.
 
-Ten default roles ship from the process design's role table (`make seed`), and
+**Every final approval routes to the CEO** — order kickoff, BOQ release,
+purchase and service order approval above the threshold, site requisitions,
+schedule extensions, expense approval and work certification. The people who
+prepare the work keep their own capabilities; only the last signature moved.
+The CEO may also hold Administrator.
+
+Twelve default roles ship from the process design's role table (`make seed`), and
 the capability catalogue lives in `apps/accounts/capabilities.py` — the admin
 screen offers a checklist of what exists, so a typo cannot silently grant
 nothing. Every role and assignment change is audited.

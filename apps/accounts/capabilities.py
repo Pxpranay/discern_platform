@@ -83,25 +83,42 @@ def unknown(codes) -> set[str]:
 #: Roles created by ``seed_roles``. These mirror the roles in the process
 #: design's "Roles Along the Chain" table, so a fresh install starts with
 #: something recognisable rather than an empty permissions screen.
+#: Every capability that is a *final* sign-off — the last signature before
+#: something is committed, ordered, released or paid. Discern's instruction is
+#: that these route to the CEO at this stage.
+FINAL_APPROVALS = [
+    "order:approve_kickoff",
+    "boq_revision:release",
+    "purchase_order:approve",
+    "procurement:approve_request",
+    "project:extend_schedule",
+    "expenses:approve",
+    "service_order:certify",
+]
+
 DEFAULT_ROLES: list[tuple[str, str, list[str]]] = [
     ("administrator", "Administrator", sorted(ALL_CODES)),
+    ("ceo", "CEO", sorted(set(FINAL_APPROVALS) | {
+        "dashboard:view", "crm:view", "sales:view", "projects:view", "boq:view",
+        "procurement:view", "receipt:view", "works:view", "expenses:view",
+        "project:plan_schedule",
+    })),
     ("director", "Director / Finance", ["dashboard:view", "crm:view", "sales:view", "projects:view", "boq:view", "procurement:view", "receipt:view"]),
     ("sales_rep", "Sales Representative", ["crm:view", "sales:view"]),
-    ("sales_manager", "Sales Manager", ["crm:view", "sales:view", "order:confirm", "order:approve_kickoff", "dashboard:view"]),
+    ("sales_manager", "Sales Manager", ["crm:view", "sales:view", "order:confirm", "dashboard:view"]),
     ("project_manager", "Project Manager", [
         "dashboard:view", "projects:view", "boq:view", "sales:view",
-        "project:plan_schedule", "project:extend_schedule", "boq_revision:release",
-        "order:approve_kickoff", "procurement:view", "procurement:approve_request",
-        "receipt:view", "works:view", "expenses:view", "expenses:approve", "stock:transfer",
+        "project:plan_schedule", "procurement:view", "receipt:view", "works:view",
+        "expenses:view", "stock:transfer",
     ]),
     ("design_manager", "Design Manager", [
         "projects:view", "boq:view", "boq:edit", "boq:sign_off", "works:view", "fabrication:manage",
     ]),
     ("construction_manager", "Construction Manager", ["projects:view", "boq:view", "boq:edit", "boq:sign_off", "procurement:request", "procurement:view", "works:view", "service_order:issue",
-        "service_order:progress", "service_order:certify", "expenses:view", "expenses:approve"]),
+        "service_order:progress", "expenses:view"]),
     ("purchase_manager", "Purchase Manager", [
         "dashboard:view", "projects:view", "boq:view", "procurement:view", "receipt:view",
-        "procurement:rfq", "procurement:award", "purchase_order:create", "purchase_order:approve",
+        "procurement:rfq", "procurement:award", "purchase_order:create",
         "stock:transfer", "works:view",
     ]),
     ("procurement_officer", "Procurement Officer", [

@@ -1,6 +1,7 @@
 """Django settings for the Discern platform."""
 
 import os
+from decimal import Decimal
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -96,6 +97,26 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_TASK_ALWAYS_EAGER = os.environ.get("CELERY_EAGER", "0") == "1"
+
+# --- Business policy ------------------------------------------------------
+# Set here rather than in code so an administrator can change them without a
+# deploy. Everything is INR: Discern trades in a single currency today, so no
+# currency is carried on amounts. See docs/PROGRESS.md for what multi-currency
+# would cost when it is needed.
+CURRENCY = "INR"
+
+#: Above this, a purchase order or service order needs the final approver's
+#: signature rather than the buyer's alone.
+APPROVAL_THRESHOLD = Decimal(os.environ.get("APPROVAL_THRESHOLD", "500000"))
+
+#: Discern's rule: every line quoted by more than two vendors. Below this
+#: value a single trusted vendor is acceptable — a three-quote exercise on a
+#: small purchase costs more than it saves. Set to 0 to require three quotes
+#: at every value.
+RFQ_MINIMUM_VENDORS = int(os.environ.get("RFQ_MINIMUM_VENDORS", "3"))
+RFQ_MINIMUM_VENDORS_BELOW_VALUE = Decimal(
+    os.environ.get("RFQ_MINIMUM_VENDORS_BELOW_VALUE", "0")
+)
 
 # --- Platform -------------------------------------------------------------
 # Maximum delivery attempts before an outbox event is dead-lettered.

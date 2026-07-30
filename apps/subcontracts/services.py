@@ -14,7 +14,10 @@ from apps.procurement.models import VendorRate
 from .models import ServiceCertification, ServiceOrder, ServiceProgress, VendorBill
 
 ZERO = Decimal("0")
-DEFAULT_APPROVAL_THRESHOLD = Decimal("500000")
+def _threshold() -> Decimal:
+    from django.conf import settings
+
+    return Decimal(str(getattr(settings, "APPROVAL_THRESHOLD", "500000")))
 
 
 def _number(prefix, model):
@@ -87,7 +90,7 @@ def issue(*, order: ServiceOrder, actor, threshold=None) -> ServiceOrder:
     if order.status == ServiceOrder.ISSUED:
         raise DomainError(f"{order.number} is already issued.")
 
-    threshold = threshold if threshold is not None else DEFAULT_APPROVAL_THRESHOLD
+    threshold = threshold if threshold is not None else _threshold()
     if order.total_value > threshold and not actor.has_capability("purchase_order:approve"):
         order.status = ServiceOrder.AWAITING_APPROVAL
         order.save(update_fields=["status"])

@@ -11,8 +11,8 @@ with every commit.
 | | |
 |---|---|
 | **Built** | Phases 0–5 — the full build plan, plus web app, admin/RBAC and mobile site screens |
-| **Tests** | 258 passing against real PostgreSQL, order-independent |
-| **Stack** | PostgreSQL 16 · Django 5 · server-rendered templates. Supabase move still open |
+| **Tests** | 264 passing against real PostgreSQL, order-independent |
+| **Stack** | PostgreSQL 16 · Django 5 · server-rendered templates. **Settled — staying as is.** |
 | **Login** | `demo` / `discern2026` (`make seed` then `make run`) |
 | **Push** | Blocked — session GitHub token is read-only. Work is delivered as `git am` patches |
 
@@ -84,6 +84,9 @@ a rollout:
 | 2 | PM emergency ceiling override, logged | `ceiling.reserve_headroom(override_actor=…)` |
 | 3 | Both fabrication modes — in-house and job work | `fabrication.FabricationOrder.mode` |
 | 4 | Transfer valued at original purchase cost | `stock.valuation_at`, `ExcessStockFlag.unit_value` |
+| 7 | INR only; no currency carried on amounts | `settings.CURRENCY` |
+| — | Every final approval routes to the CEO, who may also be Administrator | `capabilities.FINAL_APPROVALS` |
+| — | Approval threshold and vendor-minimum are settings, not constants | `settings.APPROVAL_THRESHOLD` |
 | — | Server-rendered templates, not React, to keep the stack decision open | `apps/ui/` |
 | — | Append-only via DB trigger rather than revoked grants (superusers bypass grants) | `platform_core/migrations/0002` |
 | — | Removal is a property of a change, not a sixth reconciliation outcome | `engineering/reconciliation.py` |
@@ -92,12 +95,32 @@ a rollout:
 
 ## Open questions
 
-- **Stack:** Supabase-native rewrite vs Supabase-as-Postgres keeping the Python
-  core. Deferred until the app's shape was concrete — it now is.
-- **Blocking decisions 5–8** in `05-decisions.md`: warehouse vs location per
-  site, section sign-off level, multi-currency, integration boundary. #3 and #4
-  are now built to their recommended defaults and are configuration if Discern
-  decides otherwise.
+Decided and built:
+
+- **Stack** stays as it is — PostgreSQL + Django, server-rendered.
+- **Currency: INR only.** No currency is carried on any amount. When
+  multi-currency is needed it costs a currency column on `cost_entry`, a rate
+  at posting, and a reporting decision about which rate to report at. Every
+  existing row is INR, so back-filling is trivial — the cost is in the
+  reporting rules, not the migration. Deliberately not pre-built.
+- **All final approvals route to the CEO**, who may also hold Administrator.
+  See `capabilities.FINAL_APPROVALS`.
+
+Still open, none of them blocking:
+
+- **Which item categories carry a wastage tolerance, and at what %.** Every
+  category is at 0 today, so the ceiling is the exact BOQ quantity.
+- **A value below which the three-vendor rule does not apply.**
+  `RFQ_MINIMUM_VENDORS_BELOW_VALUE` is 0, so three quotes are required at every
+  value. This is the rule buyers will meet most often.
+- **A cap on the PM emergency ceiling override.** None set.
+- **Director sign-off on large BOQs** cannot key off value — Discern's BOQ
+  documents carry no rates. Needs a different trigger (line count, project
+  value) or dropping.
+- **Warehouse vs location per site** — built as a location hierarchy. Confirm.
+- **Section sign-off level** — built as the preparing Manager's own
+  confirmation. Confirm.
+- **Integration boundary** — statutory accounting, GST, banking.
 - **BOQ approval threshold:** Discern's BOQ documents carry no rates, so a
   value-based approval rule on release can never fire. Needs a different trigger
   if Director sign-off is wanted on large BOQs.

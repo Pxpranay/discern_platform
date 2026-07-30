@@ -379,7 +379,11 @@ def create_purchase_order(*, awards: list[Award], actor, expected_delivery=None)
     return order
 
 
-DEFAULT_APPROVAL_THRESHOLD = Decimal("500000")
+def _threshold() -> Decimal:
+    """Read at call time, so changing the setting does not need a restart."""
+    from django.conf import settings
+
+    return Decimal(str(getattr(settings, "APPROVAL_THRESHOLD", "500000")))
 
 
 @transaction.atomic
@@ -399,7 +403,7 @@ def submit_purchase_order(
     if not order.lines.exists():
         raise DomainError(f"{order.number} has no lines.")
 
-    threshold = threshold if threshold is not None else DEFAULT_APPROVAL_THRESHOLD
+    threshold = threshold if threshold is not None else _threshold()
     if order.total_value > threshold and not actor.has_capability("purchase_order:approve"):
         order.status = PurchaseOrder.AWAITING_APPROVAL
         order.save(update_fields=["status"])

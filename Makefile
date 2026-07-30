@@ -17,3 +17,6 @@ test-ceiling:  ## Just the invariant that protects the design
 
 worker:
 	celery -A config worker -l info
+
+demo:      ## Run the end-to-end walkthrough against a real database
+	python manage.py demo

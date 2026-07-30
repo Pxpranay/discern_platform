@@ -172,3 +172,112 @@ class MaterialReturn(models.Model):
     class Meta:
         db_table = "material_return"
         ordering = ["-created_at"]
+
+
+class ExcessStockFlag(models.Model):
+    """Material at one site that another project may need.
+
+    Raised by a Site Engineer or Site In-Charge at any time. Deliberately not a
+    scrap: scrapping writes stock off the books, which is the opposite of
+    relabelling it as usable elsewhere.
+    """
+
+    DEAD = "dead"
+    AVAILABLE = "available_for_other_project"
+    REASON_CHOICES = [
+        (DEAD, "Dead stock — no longer needed by anyone"),
+        (AVAILABLE, "Available for another project"),
+    ]
+
+    OPEN = "open"
+    TRANSFERRED = "transferred"
+    RETAINED = "retained"
+    STATUS_CHOICES = [
+        (OPEN, "Open"),
+        (TRANSFERRED, "Redeployed"),
+        (RETAINED, "Left in place"),
+    ]
+
+    goods_receipt = models.ForeignKey(
+        GoodsReceipt, on_delete=models.PROTECT, null=True, blank=True, related_name="excess_flags"
+    )
+    item = models.ForeignKey("core.Item", on_delete=models.PROTECT, related_name="excess_flags")
+    project = models.ForeignKey(
+        "core.Project", on_delete=models.PROTECT, related_name="excess_flags"
+    )
+    location = models.ForeignKey(
+        "core.Location", on_delete=models.PROTECT, related_name="excess_flags"
+    )
+    quantity = models.DecimalField(max_digits=18, decimal_places=4)
+
+    #: Original purchase cost — decision #4. Factual, needs no judgement, and
+    #: keeps both projects reconcilable to actual spend.
+    unit_value = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+
+    reason = models.CharField(max_length=32, choices=REASON_CHOICES, default=AVAILABLE)
+    notes = models.TextField(blank=True)
+    flagged_by = models.ForeignKey(
+        "accounts.AppUser", on_delete=models.PROTECT, related_name="excess_flags"
+    )
+    flagged_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=OPEN)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "excess_stock_flag"
+        ordering = ["-flagged_at"]
+
+    def __str__(self) -> str:
+        return f"{self.quantity} of {self.item} flagged at {self.location.code}"
+
+
+class StockTransfer(models.Model):
+    """An internal move between locations.
+
+    Where it crosses projects it is the one deliberate breach of project
+    isolation — which is why it posts explicit paired cost entries rather than
+    moving stock with no cost consequence.
+    """
+
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+    COMPLETE = "complete"
+    STATUS_CHOICES = [
+        (PENDING, "Awaiting receiving PM"),
+        (ACCEPTED, "Accepted"),
+        (DECLINED, "Declined"),
+        (COMPLETE, "Transferred"),
+    ]
+
+    excess_flag = models.ForeignKey(
+        ExcessStockFlag, on_delete=models.PROTECT, null=True, blank=True, related_name="transfers"
+    )
+    item = models.ForeignKey("core.Item", on_delete=models.PROTECT, related_name="transfers")
+    from_location = models.ForeignKey(
+        "core.Location", on_delete=models.PROTECT, related_name="transfers_out"
+    )
+    to_location = models.ForeignKey(
+        "core.Location", on_delete=models.PROTECT, related_name="transfers_in"
+    )
+    quantity = models.DecimalField(max_digits=18, decimal_places=4)
+    unit_value = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    reason = models.TextField(blank=True)
+    number = models.CharField(max_length=64, unique=True)
+
+    requested_by = models.ForeignKey(
+        "accounts.AppUser", on_delete=models.PROTECT, related_name="transfers_requested"
+    )
+    accepted_by = models.ForeignKey(
+        "accounts.AppUser", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "stock_transfer"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return self.number

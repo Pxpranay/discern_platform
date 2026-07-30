@@ -1,0 +1,48 @@
+{% extends "ui/base.html" %}{% load money %}
+{% block title %}Excess stock · Discern{% endblock %}
+{% block content %}
+<h1>Dead &amp; excess stock</h1>
+<p class="sub">Material at one site that another project may need. Flagging is not scrapping — scrapping writes stock off the books, this relabels it as usable elsewhere.</p>
+
+<div class="card"><h2>Flagged</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Item</th><th>Project</th><th>Location</th><th class="num">Qty</th><th class="num">Value</th><th>Reason</th><th>Redeploy to</th></tr></thead>
+  <tbody>{% for f in flags %}
+    <tr><td>{{ f.item.name }}</td><td>{{ f.project.code }}</td><td>{{ f.location.code }}</td>
+      <td class="num">{{ f.quantity|qty }}</td>
+      <td class="num">{% if f.unit_value %}{{ f.unit_value|rupees }}{% else %}—{% endif %}</td>
+      <td>{% if f.status == 'transferred' %}<span class="pill ok">redeployed</span>{% else %}<span class="pill warn">{{ f.get_reason_display|truncatechars:24 }}</span>{% endif %}</td>
+      <td>{% if f.status == 'open' %}<form method="post" class="inline">{% csrf_token %}
+        <input type="hidden" name="action" value="redeploy"><input type="hidden" name="flag" value="{{ f.pk }}">
+        <select name="to_location">{% for l in locations %}<option value="{{ l.pk }}">{{ l.code }}</option>{% endfor %}</select>
+        <button class="btn sec" type="submit">Propose</button></form>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="7" class="empty">Nothing flagged.</td></tr>{% endfor %}</tbody>
+</table></div>
+<div class="body" style="border-top:1px solid var(--hair)">
+  <form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="flag">
+    <div style="flex:1"><label>Received line</label><select name="receipt" style="width:100%">{% for r in receipts %}<option value="{{ r.pk }}">{{ r.number }} — {{ r.purchase_order_line.description|truncatechars:34 }} at {{ r.location.code }}</option>{% endfor %}</select></div>
+    <div><label>Qty</label><input name="quantity" style="width:5rem" required></div>
+    <div><label>Reason</label><select name="reason">{% for v, lbl in reasons %}<option value="{{ v }}">{{ lbl }}</option>{% endfor %}</select></div>
+    <button class="btn" type="submit">Flag</button>
+  </form>
+</div></div>
+
+<div class="card"><h2>Transfers</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Number</th><th>Item</th><th>From</th><th>To</th><th class="num">Qty</th><th>Status</th><th></th></tr></thead>
+  <tbody>{% for t in transfers %}
+    <tr><td>{{ t.number }}</td><td>{{ t.item.name }}</td><td>{{ t.from_location.code }}</td><td>{{ t.to_location.code }}</td>
+      <td class="num">{{ t.quantity|qty }}</td>
+      <td>{% if t.status == 'complete' %}<span class="pill ok">transferred</span>
+          {% elif t.status == 'declined' %}<span class="pill no">declined</span>
+          {% else %}<span class="pill warn">awaiting receiving PM</span>{% endif %}</td>
+      <td style="text-align:right">{% if t.status == 'pending' %}
+        <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="accept"><input type="hidden" name="transfer" value="{{ t.pk }}"><button class="btn" type="submit">Accept</button></form>
+        <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="decline"><input type="hidden" name="transfer" value="{{ t.pk }}"><button class="btn sec" type="submit">Decline</button></form>
+      {% endif %}</td></tr>
+  {% empty %}<tr><td colspan="7" class="empty">No transfers.</td></tr>{% endfor %}</tbody>
+</table></div>
+<div class="body" style="border-top:1px solid var(--hair)">
+  <p class="sub" style="margin:0;font-size:.84rem">Accepting posts paired cost entries at the original purchase cost — credit to the releasing project, debit to the receiving one. This is the one deliberate breach of project isolation, which is why the value moves explicitly rather than the stock moving silently.</p>
+</div></div>
+{% endblock %}

@@ -42,6 +42,16 @@ CAPABILITIES: list[tuple[str, str, str, str]] = [
     ("receipt:record", "Record what physically arrived (Store Keeper)", "Receipts", ACTION),
     ("receipt:verify", "Verify quantity and quality, accepting cost (Site Engineer)", "Receipts", ACTION),
     ("receipt:return", "Return material to a vendor", "Receipts", ACTION),
+    ("works:view", "See fabrication orders and subcontract service orders", "Works", VIEW),
+    ("fabrication:manage", "Raise and run fabrication orders", "Works", ACTION),
+    ("service_order:issue", "Issue a service order to a subcontractor", "Works", ACTION),
+    ("service_order:progress", "Log day-to-day progress against BOQ scope", "Works", ACTION),
+    ("service_order:certify", "Certify completed work as billable", "Works", ACTION),
+    ("expenses:view", "See site expenses", "Site expenses", VIEW),
+    ("expenses:submit", "Submit a site expense claim", "Site expenses", ACTION),
+    ("expenses:approve", "Approve a site expense", "Site expenses", ACTION),
+    ("stock:flag_excess", "Flag received stock as dead or available elsewhere", "Receipts", ACTION),
+    ("stock:transfer", "Redeploy stock between projects", "Receipts", ACTION),
     ("admin:manage", "Manage users, roles and project assignments", "Administration", VIEW),
 ]
 
@@ -82,13 +92,17 @@ DEFAULT_ROLES: list[tuple[str, str, list[str]]] = [
         "dashboard:view", "projects:view", "boq:view", "sales:view",
         "project:plan_schedule", "project:extend_schedule", "boq_revision:release",
         "order:approve_kickoff", "procurement:view", "procurement:approve_request",
-        "receipt:view",
+        "receipt:view", "works:view", "expenses:view", "expenses:approve", "stock:transfer",
     ]),
-    ("design_manager", "Design Manager", ["projects:view", "boq:view", "boq:edit", "boq:sign_off"]),
-    ("construction_manager", "Construction Manager", ["projects:view", "boq:view", "boq:edit", "boq:sign_off", "procurement:request", "procurement:view"]),
+    ("design_manager", "Design Manager", [
+        "projects:view", "boq:view", "boq:edit", "boq:sign_off", "works:view", "fabrication:manage",
+    ]),
+    ("construction_manager", "Construction Manager", ["projects:view", "boq:view", "boq:edit", "boq:sign_off", "procurement:request", "procurement:view", "works:view", "service_order:issue",
+        "service_order:progress", "service_order:certify", "expenses:view", "expenses:approve"]),
     ("purchase_manager", "Purchase Manager", [
         "dashboard:view", "projects:view", "boq:view", "procurement:view", "receipt:view",
         "procurement:rfq", "procurement:award", "purchase_order:create", "purchase_order:approve",
+        "stock:transfer", "works:view",
     ]),
     ("procurement_officer", "Procurement Officer", [
         "projects:view", "boq:view", "procurement:view", "receipt:view",
@@ -97,6 +111,7 @@ DEFAULT_ROLES: list[tuple[str, str, list[str]]] = [
     ("store_keeper", "Store / Site Keeper", ["projects:view", "receipt:view", "receipt:record"]),
     ("site_engineer", "Site Engineer", [
         "projects:view", "boq:view", "receipt:view", "receipt:verify", "receipt:return",
-        "procurement:request",
+        "procurement:request", "works:view", "service_order:progress",
+        "stock:flag_excess", "expenses:view", "expenses:submit",
     ]),
 ]

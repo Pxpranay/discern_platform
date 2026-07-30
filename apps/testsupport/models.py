@@ -19,6 +19,8 @@ class DemoDocument(Approvable):
 
     name = models.CharField(max_length=128)
     value = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0"))
+    #: A lifecycle field, so the post-lock write boundary can be exercised.
+    status = models.CharField(max_length=32, default="draft")
 
     audit_fields = ("name", "value")
 

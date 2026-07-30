@@ -207,6 +207,22 @@ class Approvable(models.Model):
     #: Fields whose values are captured in the override audit trail.
     audit_fields: tuple[str, ...] = ()
 
+    #: Fields that may still change after the record locks.
+    #:
+    #: The lock protects the **commercial terms** — quantity, rate, scope —
+    #: not the document's lifecycle. An issued service order still has to
+    #: progress to "complete" as work is certified against it, and blocking
+    #: that would mean the lock stops the process it exists to protect. This is
+    #: the same trap the earlier Odoo design fell into, where lock-on-approval
+    #: would have blocked the received-quantity write-back and broken goods
+    #: receipt entirely.
+    #:
+    #: Only fields listed here may be written post-lock, and only when they are
+    #: the *whole* of the write.
+    post_lock_writable: tuple[str, ...] = (
+        "status", "completed_at", "issued_at", "confirmed_at", "started_at",
+    )
+
     @property
     def is_locked(self) -> bool:
         return self.locked_at is not None
@@ -221,9 +237,14 @@ class Approvable(models.Model):
         if self.pk is not None:
             stored = type(self).objects.filter(pk=self.pk).first()
             if stored is not None and stored.locked_at is not None:
-                if override is None:
-                    raise RecordLocked(self)
-                override.record(self, before=stored.snapshot(), after=self.snapshot())
+                update_fields = set(kwargs.get("update_fields") or ())
+                lifecycle_only = bool(update_fields) and update_fields.issubset(
+                    set(self.post_lock_writable)
+                )
+                if not lifecycle_only:
+                    if override is None:
+                        raise RecordLocked(self)
+                    override.record(self, before=stored.snapshot(), after=self.snapshot())
         return super().save(*args, **kwargs)
 
     def delete(self, *args, override: Override | None = None, **kwargs):

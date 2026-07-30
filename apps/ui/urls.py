@@ -1,7 +1,7 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path
 
-from . import views, views_admin, views_proc
+from . import views, views_admin, views_proc, views_works
 
 urlpatterns = [
     path("login/", auth_views.LoginView.as_view(template_name="ui/login.html"), name="login"),
@@ -21,6 +21,10 @@ urlpatterns = [
     path("procurement/rfq/<int:pk>/", views_proc.rfq_detail, name="rfq_detail"),
     path("procurement/orders/<int:pk>/", views_proc.po_detail, name="po_detail"),
     path("receipts/", views_proc.receipts, name="receipts"),
+
+    path("works/", views_works.works, name="works"),
+    path("expenses/", views_works.expenses, name="expenses"),
+    path("excess-stock/", views_works.excess_stock, name="excess_stock"),
 
     path("admin-panel/", views_admin.admin_home, name="admin_home"),
     path("admin-panel/roles/", views_admin.role_list, name="role_list"),

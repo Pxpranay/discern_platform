@@ -1,0 +1,42 @@
+{% extends "ui/base.html" %}{% load money %}
+{% block title %}Site expenses · Discern{% endblock %}
+{% block content %}
+<h1>Site expenses</h1>
+<p class="sub">Room rent, water, conveyance, fooding and miscellaneous — outside the BOQ entirely, but they still consume margin, so they post to the same ledger as material and subcontract.</p>
+
+<div class="card"><h2>Awaiting approval</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Project</th><th>Category</th><th class="num">Date</th><th class="num">Amount</th><th>Submitted by</th><th></th></tr></thead>
+  <tbody>{% for e in pending %}
+    <tr><td>{{ e.project.code }}</td><td>{{ e.get_category_display }}</td>
+      <td class="num">{{ e.expense_date }}</td><td class="num">{{ e.amount|rupees }}</td>
+      <td>{{ e.submitted_by.username }}</td>
+      <td style="text-align:right"><form method="post">{% csrf_token %}
+        <input type="hidden" name="action" value="approve"><input type="hidden" name="expense" value="{{ e.pk }}">
+        <button class="btn" type="submit">Approve</button></form></td></tr>
+  {% empty %}<tr><td colspan="6" class="empty">Nothing awaiting approval.</td></tr>{% endfor %}</tbody>
+</table></div>
+<div class="body" style="border-top:1px solid var(--hair)">
+  <p class="sub" style="margin:0;font-size:.84rem">Pending claims still show on the expense-vs-income sheet, flagged as unapproved. Hiding real spend until it is approved makes the margin look better exactly when it matters.</p>
+</div></div>
+
+<div class="card"><h2>Submit a claim</h2><div class="body">
+  <form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="submit">
+    <div><label>Project</label><select name="project">{% for p in projects %}<option value="{{ p.pk }}">{{ p.code }}</option>{% endfor %}</select></div>
+    <div><label>Category</label><select name="category">{% for v, lbl in categories %}<option value="{{ v }}">{{ lbl }}</option>{% endfor %}</select></div>
+    <div><label>Amount</label><input name="amount" style="width:7rem" required></div>
+    <div><label>Date</label><input type="date" name="expense_date" required></div>
+    <div style="flex:1"><label>Description</label><input name="description" style="width:100%"></div>
+    <button class="btn" type="submit">Submit</button>
+  </form>
+</div></div>
+
+<div class="card"><h2>Approved — in the cost ledger</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Project</th><th>Category</th><th class="num">Date</th><th class="num">Amount</th></tr></thead>
+  <tbody>{% for e in approved %}
+    <tr><td>{{ e.project.code }}</td><td>{{ e.get_category_display }}</td>
+      <td class="num">{{ e.expense_date }}</td><td class="num">{{ e.amount|rupees }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="empty">Nothing approved yet.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% endblock %}

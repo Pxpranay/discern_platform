@@ -58,6 +58,41 @@ class RecordLockingTests(TestCase):
         with self.assertRaises(RecordLocked):
             self.doc.delete()
 
+    def test_a_lifecycle_field_may_still_advance_after_locking(self):
+        """The lock protects commercial terms, not the document's lifecycle.
+
+        An issued service order still has to reach "complete" as work is
+        certified against it. Blocking that would mean the lock stops the very
+        process it exists to protect — the trap the earlier Odoo design fell
+        into, where lock-on-approval would have broken goods receipt entirely.
+        """
+        self.doc.lock(self.actor)
+        self.doc.status = "complete"
+        self.doc.save(update_fields=["status"])
+
+        self.doc.refresh_from_db()
+        self.assertEqual(self.doc.status, "complete")
+        self.assertEqual(self.doc.value, Decimal("100"), "terms must be untouched")
+
+    def test_a_terms_field_is_still_refused_even_alongside_a_lifecycle_field(self):
+        """The exemption applies only when lifecycle fields are the *whole* of
+        the write — otherwise it would be a hole big enough to drive a price
+        change through."""
+        self.doc.lock(self.actor)
+        self.doc.value = Decimal("999999")
+        with self.assertRaises(RecordLocked):
+            self.doc.save(update_fields=["value", "status"])
+        self.doc.refresh_from_db()
+        self.assertEqual(self.doc.value, Decimal("100"))
+
+    def test_an_unrestricted_save_is_still_refused_after_locking(self):
+        """A save with no update_fields could touch anything, so it is refused
+        outright rather than inspected."""
+        self.doc.lock(self.actor)
+        self.doc.value = Decimal("1")
+        with self.assertRaises(RecordLocked):
+            self.doc.save()
+
     def test_an_administrator_override_is_permitted_and_recorded(self):
         self.doc.lock(self.actor)
         self.doc.name = "corrected after approval"

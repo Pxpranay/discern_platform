@@ -1,0 +1,70 @@
+{% extends "ui/base.html" %}{% load money %}
+{% block title %}Works · Discern{% endblock %}
+{% block content %}
+<h1>Works</h1>
+<p class="sub">The two routes off a BOQ line that aren't a straight purchase — items made to drawing, and scope subcontracted out.</p>
+
+<div class="card"><h2>Fabrication orders</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Number</th><th>Item</th><th>Project</th><th class="num">Qty</th><th>Mode</th><th>Status</th><th></th></tr></thead>
+  <tbody>{% for o in fab_orders %}
+    <tr><td>{{ o.number }}</td><td>{{ o.item.name }}</td><td>{{ o.project.code }}</td>
+      <td class="num">{{ o.quantity|qty }} {{ o.uom }}</td>
+      <td>{% if o.is_job_work %}<span class="pill warn">job work · {{ o.vendor.name }}</span>{% else %}<span class="pill mute">in-house</span>{% endif %}</td>
+      <td>{% if o.status == 'complete' %}<span class="pill ok">complete</span>
+          {% elif o.status == 'awaiting_material' %}<span class="pill no">short of material</span>
+          {% else %}<span class="pill mute">{{ o.get_status_display }}</span>{% endif %}</td>
+      <td style="text-align:right">
+        {% if o.status == 'draft' %}
+          <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="shortfall"><input type="hidden" name="order" value="{{ o.pk }}"><button class="btn sec" type="submit">Check material</button></form>
+          <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="start_fab"><input type="hidden" name="order" value="{{ o.pk }}"><button class="btn sec" type="submit">Start</button></form>
+        {% elif o.status == 'in_progress' %}
+          <form method="post" class="inline" style="justify-content:flex-end">{% csrf_token %}<input type="hidden" name="action" value="complete_fab"><input type="hidden" name="order" value="{{ o.pk }}">
+            <input name="unit_cost" placeholder="unit cost" style="width:7rem"><button class="btn" type="submit">Complete</button></form>
+        {% endif %}</td></tr>
+  {% empty %}<tr><td colspan="7" class="empty">No fabrication orders.</td></tr>{% endfor %}</tbody>
+</table></div>
+<div class="body" style="border-top:1px solid var(--hair)">
+  <form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="fabricate">
+    <div><label>BOQ line (FABRICATE)</label><select name="boq_line">{% for l in fab_lines %}<option value="{{ l.pk }}">{{ l.project.code }} — {{ l.description|truncatechars:34 }}</option>{% endfor %}</select></div>
+    <div><label>Qty</label><input name="quantity" style="width:5rem" required></div>
+    <div><label>Mode</label><select name="mode">{% for v, lbl in modes %}<option value="{{ v }}">{{ lbl }}</option>{% endfor %}</select></div>
+    <div><label>Job-work vendor</label><select name="vendor"><option value="">—</option>{% for v in vendors %}<option value="{{ v.pk }}">{{ v.name }}</option>{% endfor %}</select></div>
+    <div><label>Charge</label><input name="charge" style="width:6rem"></div>
+    <button class="btn" type="submit">Raise order</button>
+  </form>
+  <p class="sub" style="margin:.7rem 0 0;font-size:.84rem">The finished quantity is capped by the BOQ ceiling. Raw materials deliberately are not — they are components consumed to produce the line, and the cap sits upstream.</p>
+</div></div>
+
+<div class="card"><h2>Service orders</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Number</th><th>Subcontractor</th><th>Scope</th><th class="num">Value</th><th>Certified</th><th>Status</th><th></th></tr></thead>
+  <tbody>{% for o in service_orders %}
+    <tr><td>{{ o.number }}</td><td>{{ o.vendor.name }}</td><td>{{ o.scope_description|truncatechars:30 }}</td>
+      <td class="num">{{ o.total_value|rupees }}</td>
+      <td><div class="bar" title="{{ o.percent_certified|floatformat:0 }}%"><i style="width:{{ o.percent_certified|floatformat:0 }}%"></i></div>
+          <span style="font-size:.78rem;color:var(--grey)">{{ o.certified_qty|qty }} / {{ o.quantity|qty }} {{ o.uom }}</span></td>
+      <td>{% if o.status == 'complete' %}<span class="pill ok">complete</span>
+          {% elif o.status == 'awaiting_approval' %}<span class="pill warn">awaiting approval</span>
+          {% else %}<span class="pill mute">{{ o.get_status_display }}</span>{% endif %}</td>
+      <td style="text-align:right">
+        {% if o.status == 'awaiting_approval' %}
+          <form method="post">{% csrf_token %}<input type="hidden" name="action" value="approve_so"><input type="hidden" name="order" value="{{ o.pk }}"><button class="btn" type="submit">Approve</button></form>
+        {% elif o.status == 'issued' %}
+          <form method="post" class="inline" style="justify-content:flex-end;margin-bottom:.35rem">{% csrf_token %}<input type="hidden" name="action" value="progress"><input type="hidden" name="order" value="{{ o.pk }}">
+            <input name="percent" placeholder="% done" style="width:5rem"><button class="btn sec" type="submit">Log</button></form>
+          <form method="post" class="inline" style="justify-content:flex-end">{% csrf_token %}<input type="hidden" name="action" value="certify"><input type="hidden" name="order" value="{{ o.pk }}">
+            <input name="quantity" placeholder="certify qty" style="width:6rem"><button class="btn" type="submit">Certify</button></form>
+        {% endif %}</td></tr>
+  {% empty %}<tr><td colspan="7" class="empty">No service orders.</td></tr>{% endfor %}</tbody>
+</table></div>
+<div class="body" style="border-top:1px solid var(--hair)">
+  <form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="service_order">
+    <div><label>BOQ line (SERVICE)</label><select name="boq_line">{% for l in service_lines %}<option value="{{ l.pk }}">{{ l.project.code }} — {{ l.description|truncatechars:34 }}</option>{% endfor %}</select></div>
+    <div><label>Subcontractor</label><select name="vendor">{% for v in vendors %}<option value="{{ v.pk }}">{{ v.name }}{% if v.is_empanelled %} ✓{% endif %}</option>{% endfor %}</select></div>
+    <div><label>Qty</label><input name="quantity" style="width:6rem" required></div>
+    <button class="btn" type="submit">Issue service order</button>
+  </form>
+  <p class="sub" style="margin:.7rem 0 0;font-size:.84rem">Only an empanelled subcontractor on an agreed rate skips the RFQ. Anyone else routes through normal procurement — which is exactly when price discovery has value. Logging progress is not certifying; only certification releases billing.</p>
+</div></div>
+{% endblock %}

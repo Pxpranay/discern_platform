@@ -75,3 +75,24 @@ def availability(item_id: int) -> list[dict]:
         )
         rows.append({"location_id": location_id, "on_hand": qty})
     return rows
+
+
+def valuation_at(item_id: int, location_id: int) -> Decimal | None:
+    """Unit value of stock held at a location — its original purchase cost.
+
+    Decision #4: original cost, not replacement cost. It is factual, needs no
+    judgement, and keeps both sides of an inter-project transfer reconcilable
+    to actual spend. Replacement cost would invent a gain or loss that neither
+    project caused.
+
+    Taken from the most recent inbound move carrying a value, which for
+    material bought in is the rate on the purchase order line it arrived on.
+    """
+    move = (
+        StockMove.objects.filter(
+            item_id=item_id, to_location_id=location_id, unit_value__isnull=False
+        )
+        .order_by("-effective_at", "-id")
+        .first()
+    )
+    return move.unit_value if move else None

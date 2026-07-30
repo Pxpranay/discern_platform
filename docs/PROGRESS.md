@@ -10,8 +10,8 @@ with every commit.
 
 | | |
 |---|---|
-| **Built** | Phases 0, 1, 2, 3 + web app + admin/RBAC |
-| **Tests** | 192 passing against real PostgreSQL, order-independent |
+| **Built** | Phases 0–4 + web app + admin/RBAC |
+| **Tests** | 235 passing against real PostgreSQL, order-independent |
 | **Stack** | PostgreSQL 16 · Django 5 · server-rendered templates. Supabase move still open |
 | **Login** | `demo` / `discern2026` (`make seed` then `make run`) |
 | **Push** | Blocked — session GitHub token is read-only. Work is delivered as `git am` patches |
@@ -46,19 +46,26 @@ with every commit.
   accepted**, discrepancies holding the vendor bill, and returns that release
   headroom so material can be re-ordered.
 
+- **Phase 4 — Works, expenses, redeployment.** Bills of materials and
+  fabrication orders in both in-house and job-work modes; raw-material
+  shortfall raising child procurement requests; service orders direct to
+  empanelled subcontractors on agreed rates, with progress logging separate
+  from certification and running-bill billing; the five site-expense
+  categories; dead/excess stock flagging with three-dashboard fan-out,
+  receiving-PM acceptance and paired cost entries at original purchase cost.
+
 ## Next
 
-**Phase 4 — Fabrication and subcontracts.** Bills of materials and fabrication
-orders (in-house and job-work); raw-material shortfall raising child
-procurement requests; service orders direct to empanelled subcontractors with
-progress logging and running-bill certification; site expenses; dead/excess
-stock flagging with inter-project transfer and paired cost entries.
+**Phase 5 — Dashboards and mobile site screens.** The Project Manager's single
+dashboard (BOQ status, site progress, purchase movement, schedule,
+profitability), the Construction Manager's expense-vs-income sheet, the
+Purchase Manager's cross-warehouse stock and value view, the Directors'
+portfolio roll-up with the override log, drill-through everywhere, and
+mobile-first screens for the site roles — receipt, verification, progress,
+expenses and stock flagging.
 
-Then Phase 5: dashboards and the mobile site screens.
-
-Blocking decisions that Phase 4 needs answered: **#3** (in-house vs job-work
-fabrication) and **#4** (transfer valuation basis). I will build both to the
-recommended defaults unless told otherwise, as with #1 and #2.
+Build plan §7 is blunt about the risk: if receipt and verification are painful
+on a phone at a site gate, the ledgers stay empty and every dashboard lies.
 
 ## Decisions taken
 
@@ -66,18 +73,22 @@ recommended defaults unless told otherwise, as with #1 and #2.
 |---|---|---|
 | 1 | Wastage tolerance per item category, default 0% | `core.ItemCategory.wastage_tolerance_pct` |
 | 2 | PM emergency ceiling override, logged | `ceiling.reserve_headroom(override_actor=…)` |
+| 3 | Both fabrication modes — in-house and job work | `fabrication.FabricationOrder.mode` |
+| 4 | Transfer valued at original purchase cost | `stock.valuation_at`, `ExcessStockFlag.unit_value` |
 | — | Server-rendered templates, not React, to keep the stack decision open | `apps/ui/` |
 | — | Append-only via DB trigger rather than revoked grants (superusers bypass grants) | `platform_core/migrations/0002` |
 | — | Removal is a property of a change, not a sixth reconciliation outcome | `engineering/reconciliation.py` |
 | — | "Needs approval" is a returned state, not a raised exception — raising rolled back the state change that reported it | `procurement/services.submit_purchase_order` |
+| — | The lock protects commercial terms, not lifecycle status — otherwise it blocks the process it exists to protect | `Approvable.post_lock_writable` |
 
 ## Open questions
 
 - **Stack:** Supabase-native rewrite vs Supabase-as-Postgres keeping the Python
   core. Deferred until the app's shape was concrete — it now is.
-- **Blocking decisions 3–8** in `05-decisions.md`: job-work fabrication,
-  transfer valuation basis, warehouse vs location per site, section sign-off
-  level, multi-currency, integration boundary. Needed before Phase 3–4.
+- **Blocking decisions 5–8** in `05-decisions.md`: warehouse vs location per
+  site, section sign-off level, multi-currency, integration boundary. #3 and #4
+  are now built to their recommended defaults and are configuration if Discern
+  decides otherwise.
 - **BOQ approval threshold:** Discern's BOQ documents carry no rates, so a
   value-based approval rule on release can never fire. Needs a different trigger
   if Director sign-off is wanted on large BOQs.

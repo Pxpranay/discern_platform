@@ -20,6 +20,7 @@ from django.utils import timezone
 
 from apps.accounts.models import AppUser, Role
 from apps.core.models import BoqLine, Item, ItemCategory, Location, Project
+from apps.inventory import services as inventory
 from apps.engineering import importers, reconciliation
 from apps.engineering import services as boq
 from apps.engineering.models import BoqRevision, Discipline, ReconciliationOutcome
@@ -34,7 +35,13 @@ from apps.projects.services import ScheduleExceedsCommitment
 from apps.sales import services as sales
 from apps.inventory import services as inventory
 from apps.procurement import services as procurement
-from apps.procurement.models import PurchaseOrder, Vendor
+from apps.fabrication import services as fab
+from apps.fabrication.models import BillOfMaterials, BomComponent, FabricationMode
+from apps.finance import services as finance
+from apps.finance.models import ExpenseCategory
+from apps.inventory.models import ExcessStockFlag
+from apps.procurement.models import PurchaseOrder, Vendor, VendorRate
+from apps.subcontracts import services as subs
 from apps.sales.models import Client, ClientInvoice, Lot, LotKind, Order
 
 FIXTURES = Path(__file__).resolve().parents[4] / "tests" / "fixtures"
@@ -94,11 +101,18 @@ class Command(BaseCommand):
         return {
             "sales_mgr": user("sales_manager", ["order:approve_kickoff"]),
             "pm": user("project_manager", ["project:extend_schedule", "boq_revision:release"]),
-            "design_mgr": user("design_manager", []),
+            "design_mgr": user("design_manager", ["fabrication:manage"]),
             "buyer": user("procurement_officer", ["procurement:rfq", "purchase_order:create"]),
-            "site_engineer": user("site_engineer", ["receipt:verify", "receipt:return"]),
+            "site_engineer": user("site_engineer", [
+                "receipt:verify", "receipt:return", "stock:flag_excess", "expenses:submit",
+            ]),
             "store": user("store_keeper", ["receipt:record"]),
+            "construction_mgr": user("construction_manager", [
+                "service_order:issue", "service_order:progress",
+                "service_order:certify", "expenses:approve",
+            ]),
             "purchase_mgr": user("purchase_manager", [
+                "stock:transfer",
                 "procurement:rfq", "procurement:award",
                 "purchase_order:create", "purchase_order:approve",
             ]),
@@ -421,27 +435,142 @@ class Command(BaseCommand):
         self.note("The rejected quantity frees its BOQ headroom, so the replacement")
         self.note("can be ordered without a revision.")
 
-        # ================================================== 7. COSTING
-        self.h1("9.  COST LEDGER — margin per project and per SITC lot")
+        # ============================================ 8b. WORKS
+        self.h1("9.  WORKS — fabricated to drawing, and subcontracted out")
 
-        costing.post_cost(
-            project_id=project.pk, lot_id=fire.pk, category=CostEntry.MATERIAL,
-            amount=Decimal("2140000"), source_type="vendor_bill", source_id=1, actor=who["buyer"],
+        self.h2("Rev 2 adds scope the earlier revisions did not have")
+        rev2 = boq.open_revision(project=project, actor=who["design_mgr"])
+        goods = rev2.sections.get(discipline=Discipline.GOODS)
+        service = rev2.sections.get(discipline=Discipline.SERVICE)
+
+        staircase = Item.objects.create(
+            code=f"stair-{stamp}", name="Custom MS staircase", uom="nos"
         )
-        costing.post_cost(
-            project_id=project.pk, lot_id=fire.pk, category=CostEntry.SUBCONTRACT,
-            amount=Decimal("910000"), source_type="vendor_bill", source_id=2, actor=who["buyer"],
+        plate = Item.objects.create(code=f"plate-{stamp}", name="MS plate 10mm", uom="kg")
+        plumbing = Item.objects.create(
+            code=f"plumb-{stamp}", name="Plumbing installation", uom="sqm",
+            item_type=Item.SERVICE,
         )
+        bom = BillOfMaterials.objects.create(item=staircase, name="Staircase")
+        BomComponent.objects.create(bom=bom, item=plate, quantity=Decimal("120"), uom="kg")
+
+        stair_line = BoqLine.objects.create(
+            project=project, section=goods, lot=fire, item=staircase,
+            sl_no="11", description="Custom MS staircase to drawing",
+            quantity=Decimal("2"), uom="nos", route=BoqLine.FABRICATE,
+        )
+        plumb_line = BoqLine.objects.create(
+            project=project, section=service, lot=fire, item=plumbing,
+            sl_no="S1", description="Plumbing installation",
+            quantity=Decimal("400"), uom="sqm", route=BoqLine.SERVICE,
+        )
+        boq.sign_off_section(section=goods, actor=who["design_mgr"])
+        boq.sign_off_section(section=service, actor=who["construction_mgr"])
+        with transaction.atomic():
+            boq.release_revision(revision=rev2, actor=who["pm"])
+        events.drain()
+        self.ok("Rev 2 released — both sections signed, this time by two people")
+        self.note("The Service section is no longer 'not applicable'.")
+
+        self.h2("Fabrication — capped on the finished item, not its components")
+        fab_order = fab.create_order(
+            boq_line=stair_line, quantity=Decimal("2"), actor=who["design_mgr"], bom=bom
+        )
+        self.ok(f"{fab_order.number} — 2 staircases, headroom now {n(headroom(stair_line.pk))}")
+        shortfall = fab.material_shortfall(fab_order)
+        for row in shortfall:
+            self.row("Short", f"{n(row['short'])} {row['uom']} of {row['item'].name}", widths=(12, 50))
+        pr2 = fab.request_shortfall(order=fab_order, actor=who["design_mgr"])
+        self.ok(f"{pr2.number} raised for the raw material")
+        self.note("Raw materials are deliberately not ceiling-checked — they are")
+        self.note("components consumed to produce the line, and the cap sits upstream.")
+
+        works_loc = Location.objects.get(code=f"{project.code}-WORKS")
+        post_move(
+            item_id=plate.pk, quantity=Decimal("240"), to_location_id=works_loc.pk,
+            unit_value=Decimal("72"), source_type="demo", source_id=1, actor=who["store"],
+        )
+        fab.start(order=fab_order, actor=who["design_mgr"])
+        fab.complete(order=fab_order, actor=who["design_mgr"], unit_cost=Decimal("41000"))
+        events.drain()
+        self.ok("Produced — 2 staircases into project stock, ₹82,000 FABRICATION cost")
+
+        self.h2("Subcontract — direct to an empanelled vendor, no RFQ")
+        subcontractor = Vendor.objects.create(name="Bengal Plumbing Works", is_empanelled=True)
+        VendorRate.objects.create(
+            vendor=subcontractor, item=plumbing, rate=Decimal("450"), uom="sqm"
+        )
+        service_order = subs.create_service_order(
+            boq_line=plumb_line, vendor=subcontractor, quantity=Decimal("400"),
+            actor=who["construction_mgr"],
+        )
+        subs.issue(order=service_order, actor=who["purchase_mgr"])
+        self.ok(f"{service_order.number} at the agreed ₹450/sqm = ₹{service_order.total_value:,.0f}")
+        self.note("Discern has agreed rates with empanelled trades; floating a tender")
+        self.note("for every service line would slow things down for no benefit.")
+
+        subs.log_progress(
+            order=service_order, percent=Decimal("55"), actor=who["site_engineer"],
+            notes="First and second floor risers complete",
+        )
+        self.ok("Site Engineer logged 55% — and that releases no money")
+        self.row("Subcontract cost", f"₹{costing.project_total(project.pk, CostEntry.SUBCONTRACT):,.0f}", widths=(24, 30))
+
+        cert = subs.certify(
+            order=service_order, quantity=Decimal("200"), actor=who["construction_mgr"]
+        )
+        events.drain()
+        self.ok(f"Running bill RA-{cert.running_bill_number} certified for 200 sqm")
+        self.row("Vendor bill", f"₹{cert.certified_value:,.0f}", widths=(24, 30))
+        self.row("Subcontract cost", f"₹{costing.project_total(project.pk, CostEntry.SUBCONTRACT):,.0f}", widths=(24, 30))
+        self.note("No goods receipt — there is nothing physical to receive.")
+
+        self.h2("Dead stock at one site, needed at another")
+        other = Project.objects.create(code=f"OTHER-{stamp}", name="Second site", status=Project.ACTIVE)
+        other_loc = Location.objects.create(
+            code=f"OTHER-{stamp}-SITE", name="Second site", kind=Location.SITE, project=other
+        )
+        flag = inventory.flag_excess(
+            item=item, location=site, quantity=Decimal("6"), actor=who["site_engineer"],
+            reason=ExcessStockFlag.AVAILABLE, notes="Run shortened after revision",
+        )
+        events.drain()
+        self.ok(f"{n(flag.quantity)} Mtr flagged — three dashboards notified")
+        transfer = inventory.redeploy(
+            flag=flag, to_location=other_loc, actor=who["purchase_mgr"],
+            reason="needed on the second site",
+        )
+        self.note(f"{transfer.number} proposed — the receiving PM must accept.")
+        inventory.accept_transfer(transfer=transfer, actor=who["purchase_mgr"])
+        events.drain()
+        self.ok("Accepted — and the value moved with the stock")
+        self.row("Releasing project", f"₹{costing.project_total(project.pk, CostEntry.STOCK_OUT):,.0f}", widths=(22, 30))
+        self.row("Receiving project", f"₹{costing.project_total(other.pk, CostEntry.STOCK_IN):,.0f}", widths=(22, 30))
+        self.note("The one deliberate breach of project isolation — which is exactly")
+        self.note("why the value moves explicitly rather than the stock moving silently.")
+
+        self.h2("Site running costs")
+        for category, amount in [
+            (ExpenseCategory.ROOM_RENT, "48000"), (ExpenseCategory.WATER, "9500"),
+            (ExpenseCategory.CONVEYANCE, "26500"), (ExpenseCategory.FOODING, "31000"),
+        ]:
+            expense = finance.submit_expense(
+                project=project, category=category, amount=Decimal(amount),
+                expense_date=date.today(), actor=who["site_engineer"],
+            )
+            finance.approve_expense(expense=expense, actor=who["construction_mgr"])
+        events.drain()
+        self.ok(f"₹{costing.project_total(project.pk, CostEntry.SITE_EXPENSE):,.0f} of site running costs approved")
+        self.note("Outside the BOQ entirely, but in the same ledger as material and")
+        self.note("subcontract — so they cannot miss the margin figure.")
+
+        # ================================================== 7. COSTING
+        self.h1("10.  COST LEDGER — margin per project and per SITC lot")
+
         costing.post_cost(
             project_id=project.pk, lot_id=hvac.pk, category=CostEntry.MATERIAL,
             amount=Decimal("1980000"), source_type="vendor_bill", source_id=3, actor=who["buyer"],
         )
-        for label, amount in [("Room rent", "48000"), ("Site conveyance", "26500"),
-                              ("Site fooding", "31000"), ("Water", "9500")]:
-            costing.post_cost(
-                project_id=project.pk, lot_id=fire.pk, category=CostEntry.SITE_EXPENSE,
-                amount=Decimal(amount), source_type="site_expense", source_id=1, actor=who["site_engineer"],
-            )
         for lot, amount, number in [(fire, "3400000", "INV-1"), (hvac, "2100000", "INV-2")]:
             invoice = ClientInvoice.objects.create(
                 order=order, lot=lot, number=f"{number}-{stamp}",
@@ -468,7 +597,7 @@ class Command(BaseCommand):
         self.note("Lot 2's thin margin is invisible in the blended project figure.")
 
         # ================================================== 8. GOVERNANCE
-        self.h1("10.  GOVERNANCE & AUDIT")
+        self.h1("11.  GOVERNANCE & AUDIT")
 
         self.h2("Administrator override of a locked record")
         from apps.platform_core.models import AdminOverride, Override

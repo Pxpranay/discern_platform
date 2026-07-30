@@ -240,3 +240,12 @@ def return_material(
         )
     events.emit("MaterialReturned", {"return_id": material_return.pk})
     return material_return
+
+
+# Dead/excess stock and redeployment live alongside receipt.
+from .services_stock import (  # noqa: E402,F401
+    accept_transfer,
+    decline_transfer,
+    flag_excess,
+    redeploy,
+)

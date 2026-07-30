@@ -1,0 +1,47 @@
+{% extends "ui/base.html" %}{% load money %}
+{% block title %}Expense vs income · Discern{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'projects' %}">Projects</a> / {{ project.code }} / Expense vs income</p>
+<h1>Site expense vs income</h1>
+<p class="sub">One query, two viewers — the Construction Manager sees this on their screen and the Project Manager on theirs. The numbers cannot disagree, because there is only one set.</p>
+
+<div class="tiles">
+  <div><span class="n">{{ revenue_total|rupees }}</span><span class="k">Invoiced to client</span></div>
+  <div><span class="n">{{ subcontract_total|rupees }}</span><span class="k">Subcontract bills</span></div>
+  <div><span class="n">{{ expense_total|rupees }}</span><span class="k">Site running costs</span></div>
+  <div><span class="n">{{ pending_total|rupees }}</span><span class="k">Claims not yet approved</span></div>
+</div>
+
+{% if pending %}
+<div class="msg info" style="margin-bottom:1.25rem"><b>{{ pending|length }} claim(s) awaiting approval, shown above.</b>
+  Real spend is not hidden until it is approved — leaving it out flatters the margin exactly when it matters.</div>
+{% endif %}
+
+<div class="grid g2">
+  <div class="card"><h2>Site running costs by category</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Category</th><th class="num">Claims</th><th class="num">Total</th></tr></thead>
+    <tbody>{% for r in breakdown %}<tr><td>{{ r.category }}</td><td class="num">{{ r.count }}</td>
+      <td class="num">{{ r.total|rupees }}</td></tr>
+    {% empty %}<tr><td colspan="3" class="empty">Nothing approved yet.</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+
+  <div class="card"><h2>Client invoices</h2>
+  <div class="scroll"><table>
+    <thead><tr><th class="num">Date</th><th class="num">Amount</th></tr></thead>
+    <tbody>{% for e in revenue %}<tr><td class="num">{{ e.effective_date }}</td>
+      <td class="num">{{ e.amount|rupees }}</td></tr>
+    {% empty %}<tr><td colspan="2" class="empty">Nothing invoiced.</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+</div>
+
+<div class="card"><h2>Dated — every posting</h2>
+<div class="scroll"><table>
+  <thead><tr><th class="num">Date</th><th>Category</th><th class="num">Amount</th></tr></thead>
+  <tbody>
+  {% for e in expenses %}<tr><td class="num">{{ e.effective_date }}</td><td><span class="pill mute">site expense</span></td><td class="num">{{ e.amount|rupees }}</td></tr>{% endfor %}
+  {% for e in subcontract %}<tr><td class="num">{{ e.effective_date }}</td><td><span class="pill warn">subcontract</span></td><td class="num">{{ e.amount|rupees }}</td></tr>{% endfor %}
+  {% for e in revenue %}<tr><td class="num">{{ e.effective_date }}</td><td><span class="pill ok">invoiced</span></td><td class="num">{{ e.amount|rupees }}</td></tr>{% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}

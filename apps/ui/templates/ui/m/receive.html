@@ -1,0 +1,22 @@
+{% extends "ui/m/base.html" %}{% load money %}
+{% block heading %}Record arrival{% endblock %}
+{% block content %}
+<h1>{{ expected.purchase_order_line.description|truncatechars:60 }}</h1>
+<p class="sub">{{ expected.purchase_order_line.purchase_order.vendor.name }} ·
+  {{ expected.purchase_order_line.purchase_order.number }}</p>
+
+<div class="card"><div class="body">
+  <div style="display:flex;gap:2rem;margin-bottom:1rem">
+    <div><label>Expected</label><span class="big">{{ expected.expected_qty|qty }}</span></div>
+    <div><label>Unit</label><span class="big">{{ expected.purchase_order_line.uom }}</span></div>
+  </div>
+  <form method="post">{% csrf_token %}
+    <label for="q">Quantity that arrived</label>
+    <input id="q" name="quantity" type="number" step="any" inputmode="decimal" required autofocus>
+    <label for="c">Vendor challan number</label>
+    <input id="c" name="challan" autocomplete="off">
+    <button type="submit">Record arrival</button>
+    <p class="hint">Recording is not accepting. A Site Engineer checks it next, and only then does the cost reach the project.</p>
+  </form>
+</div></div>
+{% endblock %}

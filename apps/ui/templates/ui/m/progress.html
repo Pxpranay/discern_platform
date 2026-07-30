@@ -1,0 +1,30 @@
+{% extends "ui/m/base.html" %}{% load money %}
+{% block heading %}Progress{% endblock %}
+{% block content %}
+<h1>{{ order.scope_description|truncatechars:60 }}</h1>
+<p class="sub">{{ order.vendor.name }} · {{ order.number }}</p>
+
+<div class="card"><div class="body">
+  <div style="display:flex;gap:2rem;margin-bottom:1rem">
+    <div><label>Certified</label><span class="big">{{ order.percent_certified|floatformat:0 }}%</span></div>
+    <div><label>Of</label><span class="big">{{ order.quantity|qty }} {{ order.uom }}</span></div>
+  </div>
+  <form method="post">{% csrf_token %}
+    <label for="p">Percent complete today</label>
+    <input id="p" name="percent" type="number" step="any" inputmode="decimal" min="0" max="100" required autofocus>
+    <label for="n">Notes</label>
+    <input id="n" name="notes" placeholder="second floor risers complete">
+    <button type="submit">Log progress</button>
+    <p class="hint">Logging progress does not release any payment. The Construction Manager certifies what is billable separately.</p>
+  </form>
+</div></div>
+
+{% if recent %}
+<div class="card"><h2>Recent reports</h2>
+{% for p in recent %}<div class="row"><div class="main">
+  <div class="ttl">{{ p.percent_complete|floatformat:0 }}%</div>
+  <div class="meta">{{ p.reported_by.username }} · {{ p.reported_at|date:"d M H:i" }}{% if p.notes %} · {{ p.notes|truncatechars:36 }}{% endif %}</div>
+</div></div>{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

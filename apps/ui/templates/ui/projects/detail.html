@@ -4,7 +4,7 @@
 {% block content %}
 <p class="crumb"><a href="{% url 'projects' %}">Projects</a> / {{ project.code }}</p>
 <h1>{{ project.name }}</h1>
-<p class="sub">{{ project.client.name|default:"" }}{% if project.order %} · order <a href="{% url 'order_detail' project.order.pk %}">{{ project.order.number }}</a>{% endif %}</p>
+<p class="sub"><a href="{% url 'pm_dashboard' project.pk %}"><b>Open the PM dashboard →</b></a><br>{{ project.client.name|default:"" }}{% if project.order %} · order <a href="{% url 'order_detail' project.order.pk %}">{{ project.order.number }}</a>{% endif %}</p>
 
 <div class="tiles">
   <div><span class="n">{{ profit.revenue|rupees }}</span><span class="k">Invoiced</span></div>

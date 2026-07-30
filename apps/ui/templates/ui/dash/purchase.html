@@ -1,0 +1,46 @@
+{% extends "ui/base.html" %}{% load money %}
+{% block title %}Purchase dashboard · Discern{% endblock %}
+{% block content %}
+<h1>Stock &amp; value, every location</h1>
+<p class="sub">Not scoped to any one project — keeping stock efficient across the company is the Purchase Manager's job.</p>
+
+<div class="tiles">
+  <div><span class="n">{{ total_value|rupees }}</span><span class="k">Stock value</span></div>
+  <div><span class="n">{{ locations }}</span><span class="k">Locations holding</span></div>
+  <div><span class="n">{{ excess|length }}</span><span class="k">Excess flagged</span></div>
+  <div><span class="n">{{ pending_transfers|length }}</span><span class="k">Transfers pending</span></div>
+  <div><span class="n">{{ orders_awaiting|length }}</span><span class="k">Orders to approve</span></div>
+  <div><span class="n">{{ receipts_unverified }}</span><span class="k">Unverified receipts</span></div>
+</div>
+
+<div class="card"><h2>Stock on hand</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Item</th><th>Location</th><th>Project</th><th class="num">On hand</th><th class="num">Unit value</th><th class="num">Value</th></tr></thead>
+  <tbody>{% for r in stock %}
+    <tr><td>{{ r.item.name|default:"—" }}</td><td>{{ r.location.code|default:"—" }}</td>
+      <td>{{ r.project.code|default:"unassigned" }}</td>
+      <td class="num">{{ r.on_hand|qty }}</td>
+      <td class="num">{% if r.unit_value %}{{ r.unit_value|rupees }}{% else %}—{% endif %}</td>
+      <td class="num">{{ r.value|rupees }}</td></tr>
+  {% empty %}<tr><td colspan="6" class="empty">No stock on hand.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+
+<div class="grid g2">
+  <div class="card"><h2>Excess flagged — redeploy instead of buying</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Item</th><th>At</th><th class="num">Qty</th></tr></thead>
+    <tbody>{% for f in excess %}<tr><td>{{ f.item.name }}</td><td>{{ f.location.code }}</td>
+      <td class="num">{{ f.quantity|qty }}</td></tr>
+    {% empty %}<tr><td colspan="3" class="empty">Nothing flagged.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <div class="body" style="border-top:1px solid var(--hair)"><a href="{% url 'excess_stock' %}">Manage excess stock →</a></div></div>
+
+  <div class="card"><h2>Orders awaiting your approval</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Order</th><th>Vendor</th><th class="num">Value</th></tr></thead>
+    <tbody>{% for o in orders_awaiting %}<tr><td><a href="{% url 'po_detail' o.pk %}">{{ o.number }}</a></td>
+      <td>{{ o.vendor.name }}</td><td class="num">{{ o.total_value|rupees }}</td></tr>
+    {% empty %}<tr><td colspan="3" class="empty">Nothing awaiting approval.</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+</div>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "ui/base.html" %}{% load money %}
+{% block title %}Portfolio · Discern{% endblock %}
+{% block content %}
+<h1>Portfolio</h1>
+<p class="sub">Every active project, worst margin first. Plus the governance queue — an Administrator override is permitted, but never quiet.</p>
+
+<div class="tiles">
+  <div><span class="n">{{ revenue|rupees }}</span><span class="k">Invoiced</span></div>
+  <div><span class="n">{{ cost|rupees }}</span><span class="k">Cost</span></div>
+  <div><span class="n">{{ margin|rupees }}</span><span class="k">Margin</span></div>
+  <div><span class="n">{% if pct %}{{ pct|floatformat:1 }}%{% else %}—{% endif %}</span><span class="k">Portfolio margin</span></div>
+  <div><span class="n">{{ at_risk|length }}</span><span class="k">Needing attention</span></div>
+  <div><span class="n">{{ dead_letters|length }}</span><span class="k">Failed hand-offs</span></div>
+</div>
+
+<div class="card"><h2>Projects — worst margin first</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Project</th><th>Client</th><th class="num">Invoiced</th><th class="num">Cost</th><th class="num">Margin</th><th class="num">%</th><th>Schedule</th></tr></thead>
+  <tbody>{% for r in rows %}
+    <tr><td><a href="{% url 'pm_dashboard' r.project.pk %}">{{ r.project.code }}</a></td>
+      <td>{{ r.project.client.name|default:"—" }}</td>
+      <td class="num">{{ r.revenue|rupees }}</td><td class="num">{{ r.cost|rupees }}</td>
+      <td class="num">{{ r.margin|rupees }}</td>
+      <td class="num">{% if r.pct %}{{ r.pct|floatformat:1 }}%{% else %}—{% endif %}</td>
+      <td>{% if r.overdue %}<span class="pill no">{{ r.overdue }} overdue</span>
+          {% elif r.extensions %}<span class="pill warn">{{ r.extensions }} extension(s)</span>
+          {% else %}<span class="pill ok">on track</span>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="7" class="empty">No active projects.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+
+<div class="card"><h2>Administrator overrides — for review</h2>
+<div class="scroll"><table>
+  <thead><tr><th class="num">When</th><th>Who</th><th>Record</th><th>Reason</th></tr></thead>
+  <tbody>{% for o in overrides %}
+    <tr><td class="num">{{ o.at|date:"Y-m-d H:i" }}</td><td>{{ o.actor.username }}</td>
+      <td>{{ o.entity_type }} #{{ o.entity_id }}</td><td>{{ o.reason }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="empty">No records have been overridden after approval.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+
+{% if dead_letters %}
+<div class="card"><h2>Hand-offs that failed and stopped retrying</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Event</th><th class="num">Attempts</th><th>Last error</th></tr></thead>
+  <tbody>{% for e in dead_letters %}<tr><td>{{ e.event_name }}</td><td class="num">{{ e.attempts }}</td>
+    <td style="font-size:.8rem">{{ e.last_error|truncatechars:120 }}</td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% endif %}
+{% endblock %}

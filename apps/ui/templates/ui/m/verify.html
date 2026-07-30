@@ -1,0 +1,22 @@
+{% extends "ui/m/base.html" %}{% load money %}
+{% block heading %}Verify{% endblock %}
+{% block content %}
+<h1>{{ receipt.purchase_order_line.description|truncatechars:60 }}</h1>
+<p class="sub">{{ receipt.number }} · recorded by {{ receipt.received_by.username }}</p>
+
+<div class="card"><div class="body">
+  <div style="margin-bottom:1rem"><label>Recorded as arrived</label>
+    <span class="big">{{ receipt.received_qty|qty }} {{ receipt.purchase_order_line.uom }}</span></div>
+  <form method="post">{% csrf_token %}
+    <label for="a">Accepted — good quantity and quality</label>
+    <input id="a" name="accepted" type="number" step="any" inputmode="decimal"
+           value="{{ receipt.received_qty|qty }}" required>
+    <label for="r">Rejected</label>
+    <input id="r" name="rejected" type="number" step="any" inputmode="decimal" value="0">
+    <label for="n">What was wrong</label>
+    <input id="n" name="notes" placeholder="dented in transit">
+    <button type="submit">Verify</button>
+    <p class="hint">Accepting posts stock and cost against the project. Anything rejected holds the vendor bill and frees the BOQ quantity so a replacement can be ordered.</p>
+  </form>
+</div></div>
+{% endblock %}

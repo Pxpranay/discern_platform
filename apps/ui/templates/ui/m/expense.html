@@ -1,0 +1,22 @@
+{% extends "ui/m/base.html" %}
+{% block heading %}Site expense{% endblock %}
+{% block content %}
+<h1>Submit an expense</h1>
+<p class="sub">Room rent, water, conveyance, fooding or miscellaneous.</p>
+<div class="card"><div class="body">
+  <form method="post">{% csrf_token %}
+    <label for="p">Project</label>
+    <select id="p" name="project">{% for pr in projects %}<option value="{{ pr.pk }}">{{ pr.code }} — {{ pr.name|truncatechars:30 }}</option>{% endfor %}</select>
+    <label for="c">Category</label>
+    <select id="c" name="category">{% for v, lbl in categories %}<option value="{{ v }}">{{ lbl }}</option>{% endfor %}</select>
+    <label for="a">Amount</label>
+    <input id="a" name="amount" type="number" step="any" inputmode="decimal" required>
+    <label for="d">Date</label>
+    <input id="d" name="expense_date" type="date" required>
+    <label for="n">Description</label>
+    <input id="n" name="description">
+    <button type="submit">Submit</button>
+    <p class="hint">It appears on the project's expense sheet immediately, marked unapproved, and posts to cost once approved.</p>
+  </form>
+</div></div>
+{% endblock %}

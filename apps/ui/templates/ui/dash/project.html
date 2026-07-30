@@ -1,0 +1,96 @@
+{% extends "ui/base.html" %}{% load money %}
+{% block title %}{{ project.code }} dashboard · Discern{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'projects' %}">Projects</a> / <a href="{% url 'project_detail' project.pk %}">{{ project.code }}</a> / Dashboard</p>
+<h1>{{ project.name }}</h1>
+<p class="sub">Everything the Project Manager is accountable for. Profitability is a named responsibility, so what it depends on is not scattered across screens.</p>
+
+<div class="tiles">
+  <div><span class="n">{{ profit.revenue|rupees }}</span><span class="k">Invoiced</span></div>
+  <div><span class="n">{{ profit.cost|rupees }}</span><span class="k">Cost</span></div>
+  <div><span class="n">{{ profit.margin|rupees }}</span><span class="k">Margin</span></div>
+  <div><span class="n">{% if boq.revision_number is not None %}Rev {{ boq.revision_number }}{% else %}—{% endif %}</span><span class="k">BOQ released</span></div>
+  <div><span class="n">{% if progress.percent is not None %}{{ progress.percent|floatformat:0 }}%{% else %}—{% endif %}</span><span class="k">Site progress</span></div>
+  <div><span class="n">{{ schedule.overdue|length }}</span><span class="k">Phases overdue</span></div>
+</div>
+
+<div class="grid g2">
+  <div class="card"><h2>BOQ status</h2><div class="body">
+    <dl class="kv">
+      <dt>Released</dt><dd>{% if boq.released %}Rev {{ boq.released.revision_number }} on {{ boq.released.released_at|date:"Y-m-d" }} by {{ boq.released.released_by.username }}{% else %}none yet{% endif %}</dd>
+      <dt>Lines</dt><dd>{{ boq.line_count }}</dd>
+      <dt>Draft open</dt><dd>{% if boq.is_draft_open %}<span class="pill warn">Rev {{ boq.latest.revision_number }} in preparation</span>{% else %}no{% endif %}</dd>
+      <dt>Outstanding</dt><dd>{% if boq.outstanding_actions %}<span class="pill warn">{{ boq.outstanding_actions }} reconciliation action(s)</span>{% else %}nothing pending{% endif %}</dd>
+    </dl>
+    {% if boq.released %}<p style="margin:.9rem 0 0"><a href="{% url 'boq_detail' boq.released.pk %}">Open the BOQ →</a></p>{% endif %}
+  </div></div>
+
+  <div class="card"><h2>Purchase movement</h2><div class="body">
+    <dl class="kv">
+      <dt>Ordered</dt><dd>{{ purchase.ordered|rupees }}</dd>
+      <dt>Received</dt><dd>{{ purchase.received|rupees }}</dd>
+      <dt>Still awaited</dt><dd>{{ purchase.outstanding|rupees }}</dd>
+      <dt>Billed</dt><dd>{{ purchase.billed|rupees }}</dd>
+      <dt>Orders</dt><dd>{{ purchase.orders }}{% if purchase.awaiting_approval %} · <span class="pill warn">{{ purchase.awaiting_approval }} awaiting approval</span>{% endif %}</dd>
+    </dl>
+    <p class="sub" style="margin:.8rem 0 0;font-size:.83rem">Ordered, received and billed are three different numbers. A single "spend" figure hides which.</p>
+    <p style="margin:.6rem 0 0"><a href="{% url 'procurement_home' %}">Procurement →</a></p>
+  </div></div>
+</div>
+
+<div class="grid g2">
+  <div class="card"><h2>Site progress</h2><div class="body">
+    {% if progress.orders %}
+    <dl class="kv">
+      <dt>Certified</dt><dd>{{ progress.percent|floatformat:1 }}% · {{ progress.certified_value|rupees }}</dd>
+      <dt>Outstanding</dt><dd>{{ progress.outstanding_value|rupees }}</dd>
+      <dt>Orders</dt><dd>{{ progress.orders }} ({{ progress.complete }} complete)</dd>
+    </dl>
+    <p class="sub" style="margin:.8rem 0 0;font-size:.83rem">Certified, not reported. Reporting progress releases no money.</p>
+    <p style="margin:.6rem 0 0"><a href="{% url 'works' %}">Works →</a></p>
+    {% else %}<p class="sub" style="margin:0">No subcontract scope on this project.</p>{% endif %}
+  </div></div>
+
+  <div class="card"><h2>Schedule</h2><div class="body">
+    <dl class="kv">
+      <dt>Committed</dt><dd>{{ schedule.committed_date|default:"not set" }}</dd>
+      <dt>Latest phase</dt><dd>{{ schedule.latest_planned_end|default:"—" }}</dd>
+      <dt>Headroom</dt><dd>{% if schedule.headroom_days is not None %}{{ schedule.headroom_days }} days{% else %}—{% endif %}</dd>
+      <dt>Phases</dt><dd>{{ schedule.complete }} of {{ schedule.phases }} complete{% if schedule.overdue %} · <span class="pill no">{{ schedule.overdue|length }} overdue</span>{% endif %}</dd>
+      <dt>Extensions</dt><dd>{{ schedule.extensions }}</dd>
+    </dl>
+    <p style="margin:.8rem 0 0"><a href="{% url 'project_detail' project.pk %}">Plan the schedule →</a></p>
+  </div></div>
+</div>
+
+<div class="card"><h2>Margin by SITC lot</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Lot</th><th class="num">Invoiced</th><th class="num">Cost</th><th class="num">Margin</th><th class="num">%</th></tr></thead>
+  <tbody>{% for lot, p in lots %}
+    <tr><td>{{ lot.name }}</td><td class="num">{{ p.revenue|rupees }}</td><td class="num">{{ p.cost|rupees }}</td>
+      <td class="num">{{ p.margin|rupees }}</td>
+      <td class="num">{% if p.revenue %}{% widthratio p.margin p.revenue 100 %}%{% else %}—{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="5" class="empty">No lots.</td></tr>{% endfor %}</tbody>
+</table></div>
+<div class="body" style="border-top:1px solid var(--hair)">
+  <p class="sub" style="margin:0;font-size:.83rem">A thin lot disappears inside a blended project figure — which is why the lot is a real entity rather than a note on a BOQ line.</p>
+</div></div>
+
+<div class="grid g2">
+  <div class="card"><h2>Cost by category</h2><div class="body">
+    <dl class="kv">{% for k, v in profit.by_category.items %}<dt>{{ k }}</dt><dd>{{ v|rupees }}</dd>
+    {% empty %}<dd class="sub" style="margin:0">Nothing posted.</dd>{% endfor %}</dl>
+    <p style="margin:.8rem 0 0"><a href="{% url 'expense_sheet' project.pk %}">Expense vs income →</a></p>
+  </div></div>
+
+  <div class="card"><h2>Needs attention</h2><div class="body">
+    {% if excess_flags %}
+      {% for f in excess_flags %}<div style="margin-bottom:.5rem;font-size:.9rem">
+        <span class="pill warn">excess</span> {{ f.quantity|qty }} of {{ f.item.name }} at {{ f.location.code }}</div>{% endfor %}
+    {% endif %}
+    {% if schedule.overdue %}{% for p in schedule.overdue %}<div style="margin-bottom:.5rem;font-size:.9rem">
+      <span class="pill no">overdue</span> {{ p.name }} — was due {{ p.planned_end }}</div>{% endfor %}{% endif %}
+    {% if not excess_flags and not schedule.overdue %}<p class="sub" style="margin:0">Nothing flagged.</p>{% endif %}
+  </div></div>
+</div>
+{% endblock %}

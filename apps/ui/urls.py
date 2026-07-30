@@ -1,7 +1,7 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path
 
-from . import views, views_admin, views_proc, views_works
+from . import views, views_admin, views_dash, views_proc, views_works
 
 urlpatterns = [
     path("login/", auth_views.LoginView.as_view(template_name="ui/login.html"), name="login"),
@@ -21,6 +21,17 @@ urlpatterns = [
     path("procurement/rfq/<int:pk>/", views_proc.rfq_detail, name="rfq_detail"),
     path("procurement/orders/<int:pk>/", views_proc.po_detail, name="po_detail"),
     path("receipts/", views_proc.receipts, name="receipts"),
+
+    path("portfolio/", views_dash.portfolio, name="portfolio"),
+    path("projects/<int:pk>/dashboard/", views_dash.pm_dashboard, name="pm_dashboard"),
+    path("procurement/dashboard/", views_dash.purchase_dashboard, name="purchase_dashboard"),
+    path("expenses/<int:pk>/sheet/", views_dash.expense_sheet, name="expense_sheet"),
+
+    path("m/", views_dash.m_home, name="m_home"),
+    path("m/receive/<int:pk>/", views_dash.m_receive, name="m_receive"),
+    path("m/verify/<int:pk>/", views_dash.m_verify, name="m_verify"),
+    path("m/progress/<int:pk>/", views_dash.m_progress, name="m_progress"),
+    path("m/expense/", views_dash.m_expense, name="m_expense"),
 
     path("works/", views_works.works, name="works"),
     path("expenses/", views_works.expenses, name="expenses"),

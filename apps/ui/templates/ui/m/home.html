@@ -1,0 +1,49 @@
+{% extends "ui/m/base.html" %}{% load money access %}
+{% block back %}{% endblock %}
+{% block heading %}Site{% endblock %}
+{% block content %}
+<h1>What needs doing</h1>
+<p class="sub">Signed in as {{ user.username }}</p>
+
+{% if user|can:"receipt:record" %}
+<div class="card"><h2>Material arriving — {{ awaited|length }}</h2>
+{% for e in awaited %}
+  <a class="row" href="{% url 'm_receive' e.pk %}">
+    <div class="main"><div class="ttl">{{ e.purchase_order_line.description|truncatechars:44 }}</div>
+      <div class="meta">{{ e.expected_qty|qty }} expected · {{ e.purchase_order_line.purchase_order.vendor.name }}<br>{{ e.location.code }}</div></div>
+    <span class="go">›</span></a>
+{% empty %}<div class="empty">Nothing awaited.</div>{% endfor %}
+</div>
+{% endif %}
+
+{% if user|can:"receipt:verify" %}
+<div class="card"><h2>To verify — {{ to_verify|length }}</h2>
+{% for r in to_verify %}
+  <a class="row" href="{% url 'm_verify' r.pk %}">
+    <div class="main"><div class="ttl">{{ r.purchase_order_line.description|truncatechars:44 }}</div>
+      <div class="meta">{{ r.received_qty|qty }} recorded by {{ r.received_by.username }}<br>{{ r.number }} · {{ r.location.code }}</div></div>
+    <span class="pill warn">check</span><span class="go">›</span></a>
+{% empty %}<div class="empty">Nothing to verify.</div>{% endfor %}
+</div>
+{% endif %}
+
+{% if user|can:"service_order:progress" %}
+<div class="card"><h2>Subcontract work</h2>
+{% for o in orders %}
+  <a class="row" href="{% url 'm_progress' o.pk %}">
+    <div class="main"><div class="ttl">{{ o.scope_description|truncatechars:40 }}</div>
+      <div class="meta">{{ o.vendor.name }} · {{ o.percent_certified|floatformat:0 }}% certified<br>{{ o.project.code }}</div></div>
+    <span class="go">›</span></a>
+{% empty %}<div class="empty">No open service orders.</div>{% endfor %}
+</div>
+{% endif %}
+
+{% if user|can:"expenses:submit" %}
+<div class="card"><h2>Expenses</h2>
+  <a class="row" href="{% url 'm_expense' %}">
+    <div class="main"><div class="ttl">Submit a site expense</div>
+      <div class="meta">Room rent, water, conveyance, fooding, misc</div></div>
+    <span class="go">›</span></a>
+</div>
+{% endif %}
+{% endblock %}

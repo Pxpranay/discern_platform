@@ -6,7 +6,7 @@ Integrated operations platform for Discern Engineering Pvt Ltd — a purpose-bui
 Enquiry → Sales → Project → BOQ → Procurement → Fabrication / Subcontract → Receipt → Costing
 ```
 
-**Status: working application covering Phases 0–4, with role-based administration. 235 tests passing. Sign in with `demo` / `discern2026`.**
+**Status: all six phases of the build plan implemented. 258 tests passing. Sign in with `demo` / `discern2026`; site screens at `/m/`.**
 
 ---
 
@@ -74,7 +74,7 @@ make seed                      # demo login + a worked project from the real BOQ
 make run                       # http://localhost:8000  —  demo / discern2026
 ```
 
-Other targets: `make test` (235 tests), `make test-ceiling` (just the
+Other targets: `make test` (258 tests), `make test-ceiling` (just the
 invariant the design rests on), `make demo` (terminal walkthrough).
 
 ### Screens
@@ -90,6 +90,10 @@ invariant the design rests on), `make demo` (terminal walkthrough).
 | **Receipts** | What is awaited, what the Store Keeper recorded, Site Engineer verification, discrepancies and returns |
 | **Works** | Fabrication orders (in-house and job work), material shortfall, service orders to subcontractors, progress and running-bill certification |
 | **Expenses** | The five site-expense categories, submission and approval |
+| **Portfolio** | Every active project worst-margin-first, the Administrator override log, failed hand-offs |
+| **PM dashboard** | BOQ status, site progress, purchase movement, schedule headroom, margin by SITC lot — with drill-through |
+| **Stock & value** | Cross-location stock and value, excess flagged for redeployment, orders awaiting approval |
+| **Site (`/m/`)** | Mobile-first: what arrived, what needs verifying, subcontract progress, expense claims |
 | **Admin** | Users, roles, a capability matrix, project assignments, and the Administrator override log |
 
 ### Who can see what

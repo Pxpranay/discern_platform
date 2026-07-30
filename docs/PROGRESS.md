@@ -10,8 +10,8 @@ with every commit.
 
 | | |
 |---|---|
-| **Built** | Phases 0–4 + web app + admin/RBAC |
-| **Tests** | 235 passing against real PostgreSQL, order-independent |
+| **Built** | Phases 0–5 — the full build plan, plus web app, admin/RBAC and mobile site screens |
+| **Tests** | 258 passing against real PostgreSQL, order-independent |
 | **Stack** | PostgreSQL 16 · Django 5 · server-rendered templates. Supabase move still open |
 | **Login** | `demo` / `discern2026` (`make seed` then `make run`) |
 | **Push** | Blocked — session GitHub token is read-only. Work is delivered as `git am` patches |
@@ -54,18 +54,27 @@ with every commit.
   categories; dead/excess stock flagging with three-dashboard fan-out,
   receiving-PM acceptance and paired cost entries at original purchase cost.
 
+- **Phase 5 — Dashboards and mobile.** The Project Manager's single dashboard
+  (BOQ status, site progress, purchase movement, schedule, profitability, margin
+  by lot), the Construction Manager's expense-vs-income sheet, the Purchase
+  Manager's cross-location stock and value view, the Directors' portfolio
+  sorted worst-margin-first with the override log and dead-letter queue, and
+  mobile-first site screens for receipt, verification, progress and expenses.
+
 ## Next
 
-**Phase 5 — Dashboards and mobile site screens.** The Project Manager's single
-dashboard (BOQ status, site progress, purchase movement, schedule,
-profitability), the Construction Manager's expense-vs-income sheet, the
-Purchase Manager's cross-warehouse stock and value view, the Directors'
-portfolio roll-up with the override log, drill-through everywhere, and
-mobile-first screens for the site roles — receipt, verification, progress,
-expenses and stock flagging.
+**The build plan is complete.** What remains is not a phase but a decision and
+a rollout:
 
-Build plan §7 is blunt about the risk: if receipt and verification are painful
-on a phone at a site gate, the ledgers stay empty and every dashboard lies.
+1. **Settle the stack question.** Supabase-native versus Supabase-as-Postgres
+   keeping the Python core. The app's shape is now concrete enough to decide on.
+2. **Blocking decisions 5–8** — warehouse vs location per site, section sign-off
+   level, multi-currency, integration boundary.
+3. **Migration and cutover** (build plan §9): master data first, in-flight
+   projects as an opening BOQ revision, then one project run in parallel for a
+   full procurement cycle with the cost figures reconciled.
+4. **Hardening for production**: real authentication policy, backups with
+   rehearsed restores, observability on outbox lag and ceiling-block frequency.
 
 ## Decisions taken
 

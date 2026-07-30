@@ -1,0 +1,10 @@
+Django>=5.1,<5.2
+psycopg2-binary>=2.9
+celery>=5.4
+redis>=5.0
+djangorestframework>=3.15
+
+# Development and test
+pytest>=8.0
+pytest-django>=4.8
+hypothesis>=6.100

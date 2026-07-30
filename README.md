@@ -6,7 +6,7 @@ Integrated operations platform for Discern Engineering Pvt Ltd — a purpose-bui
 Enquiry → Sales → Project → BOQ → Procurement → Fabrication / Subcontract → Receipt → Costing
 ```
 
-**Status: design under review. No code yet.**
+**Status: design under review. Phase 0 (platform foundations) built and tested; no business modules yet.**
 
 ---
 
@@ -61,16 +61,74 @@ Nine **structural** things changed, because building from scratch removes the co
 
 ---
 
-## What happens next
+## Running it
 
-1. **Review the design** — start with the Process Design document.
-2. **Settle the 8 blocking decisions** in the [Decisions Register](docs/05-decisions.md#tier-1--blocking-these-change-the-schema). Everything else has a recommended default and can wait for rollout.
-3. **Phase 0** — platform foundations: approval engine, commitment ledger, event bus. Nine of the ten business modules depend on these three, so they are built first and are not compressible.
+Requires Docker, or a local PostgreSQL 16 and Redis.
+
+```bash
+cp .env.example .env
+docker compose up --build      # or: make up
+make migrate
+make test                      # 69 tests
+make test-ceiling              # just the invariant the design rests on
+```
+
+Without Docker, point `POSTGRES_HOST` / `POSTGRES_USER` / `POSTGRES_DB` at a
+local server and run `python -m pytest`.
 
 ---
 
-## Proposed stack
+## What is built: Phase 0
 
-PostgreSQL 16 · Python 3.12 · Django 5 · Django REST Framework · Celery + Redis · React 18 + TypeScript · Vite
+The three mechanisms nine of the ten business modules depend on. Built first
+because building them afterwards means retrofitting each one nine times.
+
+| Component | Where | What it guarantees |
+|---|---|---|
+| **Commitment ledger** | `services/ceiling.py` | One `reserve_headroom` under `SELECT FOR UPDATE`. Signed entries, so returns and cancellations net out. Per-category wastage tolerance; logged PM override |
+| **Cost ledger** | `services/costing.py` | Append-only. Profitability and per-lot margin as queries. Corrections are reversals |
+| **Stock ledger** | `services/stock.py` | Append-only moves; on-hand and cross-location availability derived |
+| **Approval engine** | `models/approval.py`, `services/approvals.py` | Declarative rules, role enforcement, lock-on-approval in the domain layer, Administrator override with mandatory reason |
+| **Event bus** | `services/events.py` | Transactional outbox, at-least-once delivery, retries, dead-letter queue with replay |
+| **Access control** | `apps/accounts/` | Composable roles, capabilities, project-scoped querysets |
+
+Append-only is enforced by a **database trigger**, not by revoked grants —
+grants are bypassed by superusers and table owners, so a grant-based rule is
+one `psql` session away from not being a rule. See
+`apps/platform_core/migrations/0002_append_only_triggers.py`.
+
+`apps/core/` holds deliberately thin `Project`, `BoqLine`, `Item` and
+`Location` stubs — only as much as the ledgers must point at. Phases 1 and 2
+extend them rather than rehoming every foreign key.
+
+### Test coverage of the invariants
+
+69 tests, all passing against real PostgreSQL. The ones that matter:
+
+- **Property-based ceiling tests** — 150 randomized sequences of reserve,
+  release, amend and cancel. After *every* operation: committed never exceeds
+  the ceiling, never goes negative, and always equals what actually happened.
+  Release everything and headroom returns to exactly the full ceiling.
+- **Concurrency tests** — real threads on real connections. Two simultaneous
+  reservations of 60 against a ceiling of 100 yield exactly one success; ten
+  simultaneous reservations of 15 yield exactly six.
+- **Named regression tests** for each defect the redesign set out to fix,
+  including `test_return_releases_headroom_so_the_material_can_be_reordered`.
+- **Append-only tests** that attempt raw SQL `UPDATE`/`DELETE` and confirm the
+  trigger refuses them.
+
+---
+
+## What happens next
+
+1. **Review the design** — start with the Process Design document.
+2. **Settle the 8 blocking decisions** in the [Decisions Register](docs/05-decisions.md#tier-1--blocking-these-change-the-schema). Decisions #1 (wastage tolerance) and #2 (PM ceiling override) are implemented to the recommended defaults; changing them is configuration, not rework.
+3. **Phase 1** — Sales to Project: CRM, quotations, lots, orders, kickoff approval, project creation, master schedule.
+
+---
+
+## Stack
+
+PostgreSQL 16 · Python 3.12 · Django 5 · Django REST Framework · Celery + Redis · React 18 + TypeScript · Vite (frontend from Phase 1)
 
 A modular monolith, not microservices — the commitment ledger and the documents that write to it must commit atomically, and the quantity ceiling is the strongest requirement in the design. See [Architecture §1](docs/02-architecture.md#1-shape-modular-monolith).

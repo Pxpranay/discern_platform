@@ -24,6 +24,7 @@ demo:      ## Run the end-to-end walkthrough against a real database
 run:       ## Serve the app at http://localhost:8000
 	python manage.py runserver 0.0.0.0:8000
 
-seed:      ## Demo login plus a worked project from the real BOQ files
+seed:      ## Default roles, demo login, and a worked project from the real BOQ files
+	python manage.py seed_roles
 	python manage.py seed_login
 	python manage.py demo

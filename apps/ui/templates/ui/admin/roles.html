@@ -1,0 +1,28 @@
+{% extends "ui/base.html" %}
+{% block title %}Roles · Discern{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'admin_home' %}">Administration</a> / Roles</p>
+<h1>Roles</h1>
+<p class="sub">A role is a named set of permissions. Users can hold several.</p>
+
+<div class="card">
+  <h2>Roles</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Name</th><th>Code</th><th class="num">Permissions</th><th class="num">Users</th></tr></thead>
+    <tbody>
+    {% for r in roles %}
+      <tr><td><a href="{% url 'role_detail' r.pk %}">{{ r.name }}</a></td>
+        <td><code>{{ r.code }}</code></td>
+        <td class="num">{{ r.capabilities|length }}</td><td class="num">{{ r.user_count }}</td></tr>
+    {% empty %}<tr><td colspan="4" class="empty">No roles yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  <div class="body" style="border-top:1px solid var(--hair)">
+    <form method="post" class="inline">{% csrf_token %}
+      <div><label for="rn">Role name</label><input id="rn" name="name" required placeholder="Store Keeper" style="min-width:14rem"></div>
+      <div><label for="rc">Code</label><input id="rc" name="code" required placeholder="store_keeper"></div>
+      <button class="btn" type="submit">Create role</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

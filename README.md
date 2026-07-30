@@ -6,7 +6,7 @@ Integrated operations platform for Discern Engineering Pvt Ltd — a purpose-bui
 Enquiry → Sales → Project → BOQ → Procurement → Fabrication / Subcontract → Receipt → Costing
 ```
 
-**Status: working application covering Phases 0–2. 131 tests passing. Sign in with `demo` / `discern2026`.**
+**Status: working application covering Phases 0–2, with role-based administration. 152 tests passing. Sign in with `demo` / `discern2026`.**
 
 ---
 
@@ -30,6 +30,7 @@ Read in order. Each builds on the previous.
 | 4 | [**Build Plan**](docs/04-build-plan.md) | Six phases with honest effort ranges, sequencing constraints, migration and cutover, risks |
 | 5 | [**Decisions Register**](docs/05-decisions.md) | 8 blocking decisions; ~30 policy defaults to accept or override; 6 questions the design already settles |
 | 6 | [**Flowcharts**](docs/06-flowcharts.md) | Eight focused diagrams, rendered inline by GitHub |
+| — | [**Progress Log**](docs/PROGRESS.md) | Current state, what's next, decisions taken — read this first when picking the work back up |
 
 ---
 
@@ -73,7 +74,7 @@ make seed                      # demo login + a worked project from the real BOQ
 make run                       # http://localhost:8000  —  demo / discern2026
 ```
 
-Other targets: `make test` (131 tests), `make test-ceiling` (just the
+Other targets: `make test` (152 tests), `make test-ceiling` (just the
 invariant the design rests on), `make demo` (terminal walkthrough).
 
 ### Screens
@@ -85,6 +86,23 @@ invariant the design rests on), `make demo` (terminal walkthrough).
 | **Sales** | Orders and lots; confirm an order, approve it for kickoff |
 | **Projects** | Margin by SITC lot, cost by category, master schedule, record an extension, open the next BOQ revision |
 | **BOQ** | Both sections with live committed/headroom per line, add lines, sign off, mark not applicable, release, send back, and the reconciliation verdicts |
+| **Admin** | Users, roles, a capability matrix, project assignments, and the Administrator override log |
+
+### Who can see what
+
+Access is **role-based**. A role is a named set of permissions; a user holds one
+or more roles. Permissions come in two kinds:
+
+- **View** — opens a whole screen. Without it the nav item is hidden *and* the
+  URL is refused. Hiding the link alone is not access control.
+- **Action** — allows one operation inside a screen the user can otherwise see.
+  Confirming an order and approving it for kickoff are separate permissions, so
+  one person preparing an order cannot wave it through alone.
+
+Ten default roles ship from the process design's role table (`make seed`), and
+the capability catalogue lives in `apps/accounts/capabilities.py` — the admin
+screen offers a checklist of what exists, so a typo cannot silently grant
+nothing. Every role and assignment change is audited.
 
 Every button calls the same domain service the tests exercise. A view never
 writes a model directly, so the quantity ceiling, the schedule cap and

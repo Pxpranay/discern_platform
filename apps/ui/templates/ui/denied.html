@@ -1,0 +1,14 @@
+{% extends "ui/base.html" %}
+{% block title %}Not permitted · Discern{% endblock %}
+{% block content %}
+<div style="max-width:34rem;margin:3rem auto">
+  <h1>Not permitted</h1>
+  <p class="sub">Your roles do not include the permission this screen requires.</p>
+  <div class="card"><div class="body">
+    <dl class="kv"><dt>Required</dt><dd><code>{{ capability }}</code></dd>
+      <dt>Signed in as</dt><dd>{{ user.username }}</dd></dl>
+    <p class="sub" style="margin:1rem 0 0;font-size:.86rem">Ask an administrator to add a role that grants it.</p>
+  </div></div>
+  <p><a href="/">Back to the dashboard</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends "ui/base.html" %}
+{% block title %}{{ account.username }} · Discern{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'admin_home' %}">Administration</a> / <a href="{% url 'user_list' %}">Users</a> / {{ account.username }}</p>
+<h1>{{ account.username }}</h1>
+<p class="sub">{{ account.first_name }}{% if account.email %} · {{ account.email }}{% endif %}
+  {% if account.is_administrator %}<span class="pill warn">Administrator</span>{% endif %}
+  {% if not account.is_active %}<span class="pill no">disabled</span>{% endif %}</p>
+
+<div class="grid g2">
+  <div class="card">
+    <h2>Roles</h2>
+    <form method="post"><div class="body">
+      {% csrf_token %}<input type="hidden" name="action" value="roles">
+      {% for r in roles %}
+      <label style="display:flex;gap:.6rem;align-items:baseline;text-transform:none;letter-spacing:0;font-family:var(--sans);font-size:.92rem;color:var(--ink);margin-bottom:.5rem;cursor:pointer">
+        <input type="checkbox" name="roles" value="{{ r.pk }}" {% if r.pk in held_roles %}checked{% endif %}>
+        <span>{{ r.name }} <span style="color:var(--grey);font-size:.8rem">· {{ r.capabilities|length }} permissions</span></span>
+      </label>
+      {% empty %}<p class="sub" style="margin:0">No roles defined yet.</p>{% endfor %}
+      <button class="btn" type="submit" style="margin-top:.6rem">Save roles</button>
+    </div></form>
+  </div>
+
+  <div class="card">
+    <h2>Effective permissions</h2>
+    <div class="body">
+      {% if account.is_administrator %}
+        <p class="sub" style="margin:0">Administrator — holds every permission, and may override locked records.</p>
+      {% elif effective %}
+        {% for c in effective %}<div style="margin-bottom:.35rem;font-size:.9rem">{{ c.label }}<br><code style="font-size:.76rem;color:var(--grey)">{{ c.code }}</code></div>{% endfor %}
+      {% else %}
+        <p class="sub" style="margin:0">None. This user can sign in but will see no modules.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Project assignments</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Project</th><th>Role on the project</th><th></th></tr></thead>
+    <tbody>
+    {% for a in assignments %}
+      <tr><td>{{ a.project.code }} — {{ a.project.name }}</td><td>{{ a.role.name }}</td>
+        <td style="text-align:right"><form method="post">{% csrf_token %}
+          <input type="hidden" name="action" value="unassign"><input type="hidden" name="assignment" value="{{ a.pk }}">
+          <button class="btn sec" type="submit">Remove</button></form></td></tr>
+    {% empty %}<tr><td colspan="3" class="empty">No projects assigned — this user sees no project data.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  <div class="body" style="border-top:1px solid var(--hair)">
+    <form method="post" class="inline">{% csrf_token %}
+      <input type="hidden" name="action" value="projects">
+      <div><label for="pj">Project</label><select id="pj" name="project">{% for p in projects %}<option value="{{ p.pk }}">{{ p.code }} — {{ p.name }}</option>{% endfor %}</select></div>
+      <div><label for="pr">Role</label><select id="pr" name="project_role">{% for r in roles %}<option value="{{ r.pk }}">{{ r.name }}</option>{% endfor %}</select></div>
+      <button class="btn" type="submit">Assign</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Account</h2>
+  <div class="body">
+    <form method="post" class="inline" style="margin-bottom:1rem">{% csrf_token %}
+      <input type="hidden" name="action" value="password">
+      <div><label for="np">New password</label><input id="np" name="password" type="password" required></div>
+      <button class="btn sec" type="submit">Reset password</button>
+    </form>
+    <form method="post" style="display:inline">{% csrf_token %}
+      <input type="hidden" name="action" value="toggle_active">
+      <button class="btn sec" type="submit" {% if is_self %}disabled title="You cannot deactivate your own account"{% endif %}>
+        {% if account.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+    </form>
+    <form method="post" style="display:inline;margin-left:.4rem">{% csrf_token %}
+      <input type="hidden" name="action" value="toggle_admin">
+      <button class="btn sec" type="submit">{% if account.is_administrator %}Remove Administrator{% else %}Make Administrator{% endif %}</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

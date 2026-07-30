@@ -1,0 +1,32 @@
+{% extends "ui/base.html" %}
+{% block title %}Users · Discern{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'admin_home' %}">Administration</a> / Users</p>
+<h1>Users</h1>
+<p class="sub">Give a person roles, and assign them to the projects they work on.</p>
+
+<div class="card">
+  <h2>Users</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Username</th><th>Name</th><th>Email</th><th class="num">Roles</th><th class="num">Projects</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for u in users %}
+      <tr><td><a href="{% url 'user_detail' u.pk %}">{{ u.username }}</a>
+            {% if u.is_administrator %}<span class="pill warn" style="margin-left:.35rem">admin</span>{% endif %}</td>
+        <td>{{ u.first_name|default:"—" }}</td><td>{{ u.email|default:"—" }}</td>
+        <td class="num">{{ u.role_count }}</td><td class="num">{{ u.project_count }}</td>
+        <td>{% if u.is_active %}<span class="pill ok">active</span>{% else %}<span class="pill no">disabled</span>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="6" class="empty">No users.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  <div class="body" style="border-top:1px solid var(--hair)">
+    <form method="post" class="inline">{% csrf_token %}
+      <div><label for="un">Username</label><input id="un" name="username" required></div>
+      <div><label for="fn">Full name</label><input id="fn" name="first_name"></div>
+      <div><label for="em">Email</label><input id="em" name="email" type="email"></div>
+      <div><label for="pw">Password</label><input id="pw" name="password" type="password"></div>
+      <button class="btn" type="submit">Add user</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

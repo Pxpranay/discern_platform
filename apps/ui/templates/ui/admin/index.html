@@ -1,0 +1,58 @@
+{% extends "ui/base.html" %}
+{% block title %}Administration · Discern{% endblock %}
+{% block content %}
+<h1>Administration</h1>
+<p class="sub">Who can open what. A role is a set of permissions; a user holds one or more roles.</p>
+
+<div class="tiles">
+  <div><span class="n">{{ users|length }}</span><span class="k">Users</span></div>
+  <div><span class="n">{{ roles|length }}</span><span class="k">Roles</span></div>
+  <div><span class="n">{{ overrides|length }}</span><span class="k">Recent overrides</span></div>
+</div>
+
+<div class="grid g2">
+  <div class="card">
+    <h2>Users</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>User</th><th class="num">Roles</th><th class="num">Projects</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for u in users %}
+        <tr><td><a href="{% url 'user_detail' u.pk %}">{{ u.username }}</a>
+              {% if u.is_administrator %}<span class="pill warn" style="margin-left:.35rem">admin</span>{% endif %}</td>
+          <td class="num">{{ u.role_count }}</td><td class="num">{{ u.project_count }}</td>
+          <td>{% if u.is_active %}<span class="pill ok">active</span>{% else %}<span class="pill no">disabled</span>{% endif %}</td></tr>
+      {% empty %}<tr><td colspan="4" class="empty">No users.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+    <div class="body" style="border-top:1px solid var(--hair)"><a href="{% url 'user_list' %}">Manage users →</a></div>
+  </div>
+
+  <div class="card">
+    <h2>Roles</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Role</th><th class="num">Permissions</th><th class="num">Users</th></tr></thead>
+      <tbody>
+      {% for r in roles %}
+        <tr><td><a href="{% url 'role_detail' r.pk %}">{{ r.name }}</a>
+              <br><span style="color:var(--grey);font-size:.8rem;font-family:var(--mono)">{{ r.code }}</span></td>
+          <td class="num">{{ r.capabilities|length }}</td><td class="num">{{ r.user_count }}</td></tr>
+      {% empty %}<tr><td colspan="3" class="empty">No roles. Run <code>make seed</code>.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+    <div class="body" style="border-top:1px solid var(--hair)"><a href="{% url 'role_list' %}">Manage roles →</a></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Administrator overrides — Director review</h2>
+  <div class="scroll"><table>
+    <thead><tr><th class="num">When</th><th>Who</th><th>Record</th><th>Reason</th></tr></thead>
+    <tbody>
+    {% for o in overrides %}
+      <tr><td class="num">{{ o.at|date:"Y-m-d H:i" }}</td><td>{{ o.actor.username }}</td>
+        <td>{{ o.entity_type }} #{{ o.entity_id }}</td><td>{{ o.reason }}</td></tr>
+    {% empty %}<tr><td colspan="4" class="empty">No overrides of locked records.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

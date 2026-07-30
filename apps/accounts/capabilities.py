@@ -1,0 +1,80 @@
+"""The capability catalogue.
+
+One registry, so the admin screen can offer a checklist of what actually exists
+rather than a free-text box where a typo silently grants nothing. A capability
+string that is not in here is a bug, and the admin screen will not show it.
+
+Two kinds:
+
+* **View** capabilities gate a whole screen. Without one, the nav item is not
+  shown and the URL returns "not permitted" — hiding the link alone is not
+  access control.
+* **Action** capabilities gate a single operation inside a screen the user can
+  otherwise see: a Purchase Manager may open a project without being able to
+  extend its committed delivery date.
+"""
+
+VIEW = "view"
+ACTION = "action"
+
+#: (code, label, group, kind)
+CAPABILITIES: list[tuple[str, str, str, str]] = [
+    ("dashboard:view", "See the portfolio dashboard", "Dashboard", VIEW),
+    ("crm:view", "See leads and the opportunity pipeline", "CRM", VIEW),
+    ("sales:view", "See orders and lots", "Sales", VIEW),
+    ("order:confirm", "Confirm an order and set its committed delivery date", "Sales", ACTION),
+    ("order:approve_kickoff", "Approve a confirmed order for project kickoff", "Sales", ACTION),
+    ("projects:view", "See projects, schedules and margin", "Projects", VIEW),
+    ("project:plan_schedule", "Add and re-plan master schedule phases", "Projects", ACTION),
+    ("project:extend_schedule", "Extend the committed delivery date (CEO / PM only)", "Projects", ACTION),
+    ("boq:view", "See BOQ revisions and reconciliation", "BOQ", VIEW),
+    ("boq:edit", "Add or change lines on a draft revision", "BOQ", ACTION),
+    ("boq:sign_off", "Sign off a discipline section", "BOQ", ACTION),
+    ("boq_revision:release", "Release a revision downstream (Project Manager)", "BOQ", ACTION),
+    ("admin:manage", "Manage users, roles and project assignments", "Administration", VIEW),
+]
+
+ALL_CODES = {code for code, _, _, _ in CAPABILITIES}
+
+
+def grouped() -> dict[str, list[dict]]:
+    """Capabilities by group, for the role editor."""
+    out: dict[str, list[dict]] = {}
+    for code, label, group, kind in CAPABILITIES:
+        out.setdefault(group, []).append(
+            {"code": code, "label": label, "kind": kind, "is_view": kind == VIEW}
+        )
+    return out
+
+
+def label_for(code: str) -> str:
+    for c, label, _, _ in CAPABILITIES:
+        if c == code:
+            return label
+    return code
+
+
+def unknown(codes) -> set[str]:
+    """Codes not in the catalogue — surfaced rather than silently accepted."""
+    return set(codes) - ALL_CODES
+
+
+#: Roles created by ``seed_roles``. These mirror the roles in the process
+#: design's "Roles Along the Chain" table, so a fresh install starts with
+#: something recognisable rather than an empty permissions screen.
+DEFAULT_ROLES: list[tuple[str, str, list[str]]] = [
+    ("administrator", "Administrator", sorted(ALL_CODES)),
+    ("director", "Director / Finance", ["dashboard:view", "crm:view", "sales:view", "projects:view", "boq:view"]),
+    ("sales_rep", "Sales Representative", ["crm:view", "sales:view"]),
+    ("sales_manager", "Sales Manager", ["crm:view", "sales:view", "order:confirm", "order:approve_kickoff", "dashboard:view"]),
+    ("project_manager", "Project Manager", [
+        "dashboard:view", "projects:view", "boq:view", "sales:view",
+        "project:plan_schedule", "project:extend_schedule", "boq_revision:release",
+        "order:approve_kickoff",
+    ]),
+    ("design_manager", "Design Manager", ["projects:view", "boq:view", "boq:edit", "boq:sign_off"]),
+    ("construction_manager", "Construction Manager", ["projects:view", "boq:view", "boq:edit", "boq:sign_off"]),
+    ("purchase_manager", "Purchase Manager", ["dashboard:view", "projects:view", "boq:view"]),
+    ("procurement_officer", "Procurement Officer", ["projects:view", "boq:view"]),
+    ("site_engineer", "Site Engineer", ["projects:view", "boq:view"]),
+]

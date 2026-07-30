@@ -10,7 +10,6 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -26,6 +25,8 @@ from apps.projects import services as project_services
 from apps.projects.models import SchedulePhase
 from apps.sales import services as sales_services
 from apps.sales.models import Client, Lot, Order
+
+from .access import require_action, requires
 
 
 def _decimal(raw, field):
@@ -43,7 +44,7 @@ def _date(raw, field):
 
 
 # --------------------------------------------------------------- dashboard
-@login_required
+@requires("dashboard:view")
 def dashboard(request):
     projects = Project.objects.select_related("client", "order").order_by("-created_at")
     rows = []
@@ -86,7 +87,7 @@ def dashboard(request):
 
 
 # --------------------------------------------------------------------- CRM
-@login_required
+@requires("crm:view")
 def crm(request):
     return render(
         request,
@@ -105,7 +106,7 @@ def crm(request):
 
 
 # ------------------------------------------------------------------- sales
-@login_required
+@requires("sales:view")
 def orders(request):
     return render(
         request,
@@ -120,7 +121,7 @@ def orders(request):
     )
 
 
-@login_required
+@requires("sales:view")
 def order_detail(request, pk):
     order = get_object_or_404(Order.objects.select_related("client"), pk=pk)
 
@@ -128,6 +129,7 @@ def order_detail(request, pk):
         action = request.POST.get("action")
         try:
             if action == "confirm":
+                require_action(request, "order:confirm")
                 sales_services.confirm_order(
                     order=order,
                     committed_delivery_date=_date(
@@ -137,6 +139,7 @@ def order_detail(request, pk):
                 )
                 messages.success(request, "Order confirmed. It now waits at the kickoff gate.")
             elif action == "kickoff":
+                require_action(request, "order:approve_kickoff")
                 sales_services.approve_for_kickoff(order=order, actor=request.user)
                 events.drain()
                 messages.success(request, "Approved for kickoff — the project has been created.")
@@ -163,7 +166,7 @@ def order_detail(request, pk):
 
 
 # ---------------------------------------------------------------- projects
-@login_required
+@requires("projects:view")
 def projects(request):
     return render(
         request,
@@ -177,7 +180,7 @@ def projects(request):
     )
 
 
-@login_required
+@requires("projects:view")
 def project_detail(request, pk):
     project = get_object_or_404(
         Project.objects.select_related("client", "order"), pk=pk
@@ -187,6 +190,7 @@ def project_detail(request, pk):
         action = request.POST.get("action")
         try:
             if action == "plan_phase":
+                require_action(request, "project:plan_schedule")
                 project_services.plan_phase(
                     project=project,
                     name=request.POST.get("name", "").strip() or "Untitled phase",
@@ -207,6 +211,7 @@ def project_detail(request, pk):
                 )
                 messages.success(request, "Committed delivery date extended.")
             elif action == "open_revision":
+                require_action(request, "boq:edit")
                 revision = boq_services.open_revision(project=project, actor=request.user)
                 messages.success(request, f"BOQ Rev {revision.revision_number} opened.")
                 return redirect("boq_detail", pk=revision.pk)
@@ -239,7 +244,7 @@ def project_detail(request, pk):
 
 
 # --------------------------------------------------------------------- BOQ
-@login_required
+@requires("boq:view")
 def boq_list(request):
     return render(
         request,
@@ -253,7 +258,7 @@ def boq_list(request):
     )
 
 
-@login_required
+@requires("boq:view")
 def boq_detail(request, pk):
     revision = get_object_or_404(
         BoqRevision.objects.select_related("project", "released_by"), pk=pk
@@ -263,27 +268,32 @@ def boq_detail(request, pk):
         action = request.POST.get("action")
         try:
             if action == "sign_off":
+                require_action(request, "boq:sign_off")
                 section = get_object_or_404(
                     BoqSection, pk=request.POST.get("section_id"), revision=revision
                 )
                 boq_services.sign_off_section(section=section, actor=request.user)
                 messages.success(request, f"{section.get_discipline_display()} section signed off.")
             elif action == "not_applicable":
+                require_action(request, "boq:sign_off")
                 section = get_object_or_404(
                     BoqSection, pk=request.POST.get("section_id"), revision=revision
                 )
                 boq_services.mark_section_not_applicable(section=section, actor=request.user)
                 messages.success(request, "Section marked not applicable.")
             elif action == "release":
+                require_action(request, "boq_revision:release")
                 boq_services.release_revision(revision=revision, actor=request.user)
                 events.drain()
                 messages.success(request, "Revision released. Reconciliation has run.")
             elif action == "send_back":
+                require_action(request, "boq_revision:release")
                 boq_services.send_back(
                     revision=revision, reason=request.POST.get("reason", ""), actor=request.user
                 )
                 messages.info(request, "Revision sent back for revision.")
             elif action == "add_line":
+                require_action(request, "boq:edit")
                 section = get_object_or_404(
                     BoqSection, pk=request.POST.get("section_id"), revision=revision
                 )

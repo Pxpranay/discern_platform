@@ -1,4 +1,4 @@
-{% load static %}<!doctype html>
+{% load access %}<!doctype html>
 <html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
@@ -78,11 +78,12 @@ input:focus,select:focus,textarea:focus,button:focus{outline:2px solid var(--cya
   <div class="brand">DISCERN <span>· Operations</span></div>
   {% if user.is_authenticated %}
   <nav class="main">
-    <a href="{% url 'dashboard' %}" class="{% if nav == 'dashboard' %}on{% endif %}">Dashboard</a>
-    <a href="{% url 'crm' %}" class="{% if nav == 'crm' %}on{% endif %}">CRM</a>
-    <a href="{% url 'orders' %}" class="{% if nav == 'sales' %}on{% endif %}">Sales</a>
-    <a href="{% url 'projects' %}" class="{% if nav == 'projects' %}on{% endif %}">Projects</a>
-    <a href="{% url 'boq_list' %}" class="{% if nav == 'boq' %}on{% endif %}">BOQ</a>
+    {% if user|can:"dashboard:view" %}<a href="{% url 'dashboard' %}" class="{% if nav == 'dashboard' %}on{% endif %}">Dashboard</a>{% endif %}
+    {% if user|can:"crm:view" %}<a href="{% url 'crm' %}" class="{% if nav == 'crm' %}on{% endif %}">CRM</a>{% endif %}
+    {% if user|can:"sales:view" %}<a href="{% url 'orders' %}" class="{% if nav == 'sales' %}on{% endif %}">Sales</a>{% endif %}
+    {% if user|can:"projects:view" %}<a href="{% url 'projects' %}" class="{% if nav == 'projects' %}on{% endif %}">Projects</a>{% endif %}
+    {% if user|can:"boq:view" %}<a href="{% url 'boq_list' %}" class="{% if nav == 'boq' %}on{% endif %}">BOQ</a>{% endif %}
+    {% if user|can:"admin:manage" %}<a href="{% url 'admin_home' %}" class="{% if nav == 'admin' %}on{% endif %}">Admin</a>{% endif %}
   </nav>
   <div class="who">
     <span>{{ user.username }}</span>

@@ -1,0 +1,49 @@
+{% extends "ui/base.html" %}
+{% block title %}{{ role.name }} · Discern{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'admin_home' %}">Administration</a> / <a href="{% url 'role_list' %}">Roles</a> / {{ role.code }}</p>
+<h1>{{ role.name }}</h1>
+<p class="sub">Tick what this role may do. <b>View</b> permissions open a screen; <b>action</b> permissions allow one operation inside it.</p>
+
+<form method="post">
+{% csrf_token %}
+<div class="card">
+  <h2>Name</h2>
+  <div class="body"><input name="name" value="{{ role.name }}" style="min-width:20rem"></div>
+</div>
+
+{% for g in groups %}
+<div class="card">
+  <h2>{{ g.name }}</h2>
+  <div class="body">
+    {% for c in g.caps %}
+    <label style="display:flex;gap:.6rem;align-items:flex-start;text-transform:none;letter-spacing:0;font-family:var(--sans);font-size:.92rem;color:var(--ink);margin-bottom:.6rem;cursor:pointer">
+      <input type="checkbox" name="capabilities" value="{{ c.code }}" {% if c.held %}checked{% endif %} style="margin-top:.25rem">
+      <span>{{ c.label }}
+        <span class="pill {% if c.is_view %}warn{% else %}mute{% endif %}" style="margin-left:.4rem">{{ c.kind }}</span>
+        <br><code style="font-size:.78rem;color:var(--grey)">{{ c.code }}</code></span>
+    </label>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+
+<button class="btn" type="submit">Save permissions</button>
+</form>
+
+<div class="card" style="margin-top:1.5rem">
+  <h2>Held by</h2>
+  <div class="scroll"><table><tbody>
+  {% for u in holders %}<tr><td><a href="{% url 'user_detail' u.pk %}">{{ u.username }}</a></td></tr>
+  {% empty %}<tr><td class="empty">Nobody holds this role.</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% if not holders %}
+  <div class="body" style="border-top:1px solid var(--hair)">
+    <form method="post" onsubmit="return confirm('Delete this role?')">{% csrf_token %}
+      <input type="hidden" name="action" value="delete">
+      <button class="btn danger" type="submit">Delete role</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

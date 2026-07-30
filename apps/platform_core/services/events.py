@@ -9,6 +9,7 @@ cannot lose one that did.
 import logging
 import traceback
 from collections import defaultdict
+from contextlib import contextmanager
 from typing import Callable
 
 from django.conf import settings
@@ -37,9 +38,33 @@ def registered_handlers(event_name: str) -> list[Callable]:
     return list(_HANDLERS.get(event_name, []))
 
 
-def clear_handlers() -> None:
-    """Test helper. Never call from application code."""
+def snapshot_handlers() -> dict[str, list[Callable]]:
+    """Copy the current registry. Test helper; never call from app code."""
+    return {name: list(fns) for name, fns in _HANDLERS.items()}
+
+
+def restore_handlers(snapshot: dict[str, list[Callable]]) -> None:
+    """Put a snapshot back. Test helper; never call from app code."""
     _HANDLERS.clear()
+    _HANDLERS.update({name: list(fns) for name, fns in snapshot.items()})
+
+
+@contextmanager
+def isolated_handlers():
+    """Run with an empty registry, restoring the real one afterwards.
+
+    Tests that register throwaway handlers must not evict the application's
+    own, which are registered once at startup in ``AppConfig.ready`` and never
+    re-registered. Clearing the registry outright made unrelated tests fail
+    depending on execution order — the kind of failure that only appears once
+    the suite is big enough to shuffle.
+    """
+    saved = snapshot_handlers()
+    _HANDLERS.clear()
+    try:
+        yield
+    finally:
+        restore_handlers(saved)
 
 
 def emit(event_name: str, payload: dict, *, idempotency_key: str | None = None) -> OutboxEvent:

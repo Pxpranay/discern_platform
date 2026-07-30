@@ -57,7 +57,9 @@ Companion to [`01-process-design.md`](01-process-design.md) and [`02-architectur
 | `schedule_phase` | project, name, kind (`site_visit` \| `boq_prep` \| `procurement` \| `construction`), sequence, planned_start, planned_end, actual_start, actual_end, is_complete |
 | `schedule_extension` | project, previous_committed_date, new_committed_date, **client_agreement_reference (required)**, authorized_by, at |
 
-`effective_committed_date` starts equal to `order.committed_delivery_date` and moves only via `schedule_extension`. A check constraint prevents any `schedule_phase.planned_end` from exceeding it — the ceiling of process §4.3, enforced in the schema rather than in a form validator.
+`effective_committed_date` starts equal to `order.committed_delivery_date` and moves only via `schedule_extension`. No `schedule_phase.planned_end` may exceed it — the ceiling of process §4.3.
+
+**Correction to an earlier draft of this document:** that rule was described here as a database CHECK constraint. It cannot be one — the comparison spans two tables (`schedule_phase` and `project`), and a row-level CHECK can only see its own row. It is enforced in the domain service instead (`apps/projects/services.py`), which every write path goes through. A per-row CHECK does hold the intra-row rule that a phase cannot end before it starts.
 
 Procurement is `kind = 'procurement'` with a `sequence`, so a project needing three staged procurement windows simply has three rows. No special-casing.
 

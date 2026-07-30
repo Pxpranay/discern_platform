@@ -22,9 +22,6 @@ class TransactionGuardTests(TransactionTestCase):
     guard exists.
     """
 
-    def tearDown(self):
-        events.clear_handlers()
-
     def test_emit_requires_a_transaction(self):
         """Without one, the event could commit while the change rolls back."""
         with self.assertRaises(NotInTransaction):
@@ -53,12 +50,16 @@ class TransactionGuardTests(TransactionTestCase):
 
 
 class OutboxTests(TestCase):
+    """Each test registers throwaway handlers into an isolated registry, so it
+    cannot evict the application's own startup-registered handlers."""
+
     def setUp(self):
-        events.clear_handlers()
+        self._handlers = events.isolated_handlers()
+        self._handlers.__enter__()
         self.seen = []
 
     def tearDown(self):
-        events.clear_handlers()
+        self._handlers.__exit__(None, None, None)
 
     def test_an_event_rolls_back_with_the_change_that_raised_it(self):
         class Boom(Exception):

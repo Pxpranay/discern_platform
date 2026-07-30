@@ -62,15 +62,75 @@ class Item(models.Model):
 
 
 class Project(models.Model):
-    """Phase 0 stub. Phase 1 adds order, client, budget, schedule, PM."""
+    """The organizing unit. Cost is only ever attributed to a project.
+
+    Lives in ``core`` rather than in the ``projects`` app because the three
+    ledgers point at it, and the platform layer must not depend on a business
+    module. The ``projects`` app owns the master schedule and the initiation
+    workflow around it.
+    """
+
+    PLANNING = "planning"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    ON_HOLD = "on_hold"
+    STATUS_CHOICES = [
+        (PLANNING, "Planning"),
+        (ACTIVE, "Active"),
+        (COMPLETED, "Completed"),
+        (ON_HOLD, "On hold"),
+    ]
 
     code = models.SlugField(max_length=64, unique=True)
     name = models.CharField(max_length=256)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=PLANNING)
     is_active = models.BooleanField(default=True)
+
+    order = models.ForeignKey(
+        "sales.Order",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="projects",
+    )
+    client = models.ForeignKey(
+        "sales.Client",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="projects",
+    )
+    site_address = models.TextField(blank=True)
+    budget = models.DecimalField(
+        max_digits=18, decimal_places=2, null=True, blank=True
+    )
+    project_manager = models.ForeignKey(
+        "accounts.AppUser",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="managed_projects",
+    )
+
+    date_start = models.DateField(null=True, blank=True)
+    date_end = models.DateField(null=True, blank=True)
+
+    #: Starts equal to the order's committed delivery date and moves only via a
+    #: recorded ScheduleExtension. The hard ceiling on every schedule phase.
+    effective_committed_date = models.DateField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "project"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(date_start__isnull=True)
+                | models.Q(date_end__isnull=True)
+                | models.Q(date_end__gte=models.F("date_start")),
+                name="project_ends_after_it_starts",
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.code} {self.name}"

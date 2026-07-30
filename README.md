@@ -6,7 +6,7 @@ Integrated operations platform for Discern Engineering Pvt Ltd — a purpose-bui
 Enquiry → Sales → Project → BOQ → Procurement → Fabrication / Subcontract → Receipt → Costing
 ```
 
-**Status: design under review. Phase 0 (platform foundations) built and tested; no business modules yet.**
+**Status: design under review. Phases 0 and 1 built and tested — 97 tests passing.**
 
 ---
 
@@ -29,7 +29,7 @@ Read in order. Each builds on the previous.
 | 3 | [**Data Model**](docs/03-data-model.md) | Entities by module, key fields, and an entity-relationship summary |
 | 4 | [**Build Plan**](docs/04-build-plan.md) | Six phases with honest effort ranges, sequencing constraints, migration and cutover, risks |
 | 5 | [**Decisions Register**](docs/05-decisions.md) | 8 blocking decisions; ~30 policy defaults to accept or override; 6 questions the design already settles |
-| 6 | [**Flowcharts**](docs/06-flowcharts.md) | Six focused diagrams, rendered inline by GitHub |
+| 6 | [**Flowcharts**](docs/06-flowcharts.md) | Eight focused diagrams, rendered inline by GitHub |
 
 ---
 
@@ -69,7 +69,7 @@ Requires Docker, or a local PostgreSQL 16 and Redis.
 cp .env.example .env
 docker compose up --build      # or: make up
 make migrate
-make test                      # 69 tests
+make test                      # 97 tests
 make test-ceiling              # just the invariant the design rests on
 ```
 
@@ -101,9 +101,40 @@ one `psql` session away from not being a rule. See
 `Location` stubs — only as much as the ledgers must point at. Phases 1 and 2
 extend them rather than rehoming every foreign key.
 
+## What is built: Phase 1 — Sales to Project
+
+The first slice that produces something usable, and the one that lands `Lot`.
+
+| Module | Covers |
+|---|---|
+| **CRM** (`apps/crm`) | Leads with rule-based auto-assignment, opportunity pipeline including the site-visit and estimating stages, site visits, activities |
+| **Sales** (`apps/sales`) | Clients, quotations, **lots** (itemized and lump-sum SITC), order confirmation with a committed delivery date, change orders, client invoicing |
+| **Projects** (`apps/projects`) | Project initiation from a kicked-off order, master schedule with multi-stage procurement, the committed-date ceiling, client-agreed extensions |
+
+Two things are worth looking at specifically:
+
+**The kickoff gate and the hand-off.** A confirmed order sits in *held pending
+review*; it does not create a project. When someone with the capability
+approves it for kickoff, an `OrderApprovedForKickoff` event goes to the outbox,
+and its handler creates the project — copying the client, budget, committed
+date and every lot, and provisioning the project's own stock location. Nothing
+is re-typed. Because outbox delivery is at-least-once, initiation is idempotent.
+
+**The schedule ceiling.** No phase may be planned or rescheduled beyond the
+project's `effective_committed_date`. Raising it requires a `ScheduleExtension`
+carrying a mandatory client-agreement reference and CEO/PM authority. Every
+date change is logged with its author and reason.
+
+This is enforced in the domain service, not as a database CHECK constraint —
+the rule spans two tables, which a row-level CHECK cannot express. The data
+model document carried that error and has been corrected.
+
+---
+
 ### Test coverage of the invariants
 
-69 tests, all passing against real PostgreSQL. The ones that matter:
+97 tests, all passing against real PostgreSQL, and verified order-independent.
+The ones that matter:
 
 - **Property-based ceiling tests** — 150 randomized sequences of reserve,
   release, amend and cancel. After *every* operation: committed never exceeds
@@ -116,6 +147,12 @@ extend them rather than rehoming every foreign key.
   including `test_return_releases_headroom_so_the_material_can_be_reordered`.
 - **Append-only tests** that attempt raw SQL `UPDATE`/`DELETE` and confirm the
   trigger refuses them.
+- **Hand-off tests** proving a kicked-off order produces a project with its
+  lots, and that replaying the event does not produce a second one.
+- **Schedule ceiling tests** covering plan, reschedule, block, extend, and the
+  mandatory client agreement.
+- **Per-lot margin tests** showing an order with two SITC lots reporting two
+  margins rather than one blended figure.
 
 ---
 
@@ -123,7 +160,7 @@ extend them rather than rehoming every foreign key.
 
 1. **Review the design** — start with the Process Design document.
 2. **Settle the 8 blocking decisions** in the [Decisions Register](docs/05-decisions.md#tier-1--blocking-these-change-the-schema). Decisions #1 (wastage tolerance) and #2 (PM ceiling override) are implemented to the recommended defaults; changing them is configuration, not rework.
-3. **Phase 1** — Sales to Project: CRM, quotations, lots, orders, kickoff approval, project creation, master schedule.
+3. **Phase 2** — BOQ and the ceiling: revisions, discipline-owned sections, section sign-off, PM release, and the reconciliation engine. The build plan flags the reconciliation diff as the highest-risk item in the whole build; it wants real historical BOQ revisions from Discern to test against, not synthetic data.
 
 ---
 

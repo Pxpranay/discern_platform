@@ -13,7 +13,8 @@ with every commit.
 | **Built** | Phases 0–5 — the full build plan, plus web app, admin/RBAC and mobile site screens |
 | **Tests** | 264 passing against real PostgreSQL, order-independent |
 | **Stack** | PostgreSQL 16 · Django 5 · server-rendered templates. **Settled — staying as is.** |
-| **Login** | `demo` / `discern2026` (`make seed` then `make run`) |
+| **Login** | `demo` / `discern2026` — one command: `make up` → http://localhost:8000 |
+| **Running it** | `docs/RUNNING.md`. `manage.py bootstrap` migrates, seeds, and loads the demo project only when the DB has no project |
 | **Push** | Blocked — session GitHub token is read-only. Work is delivered as `git am` patches |
 
 ## Done
@@ -92,6 +93,8 @@ a rollout:
 | — | Removal is a property of a change, not a sixth reconciliation outcome | `engineering/reconciliation.py` |
 | — | "Needs approval" is a returned state, not a raised exception — raising rolled back the state change that reported it | `procurement/services.submit_purchase_order` |
 | — | The lock protects commercial terms, not lifecycle status — otherwise it blocks the process it exists to protect | `Approvable.post_lock_writable` |
+| — | One-command start: bootstrap is idempotent and loads the demo only into an empty database, so a restart never eats entered data | `platform_core/management/commands/bootstrap.py` |
+| — | The demo's ad-hoc roles are namespaced `demo_*` — sharing a role code with `seed_roles` meant `get_or_create` silently returned the seeded role and ignored the demo's capability list | `core/management/commands/demo.py` |
 
 ## Open questions
 

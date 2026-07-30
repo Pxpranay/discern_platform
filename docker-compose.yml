@@ -18,7 +18,10 @@ services:
 
   web:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
+    # bootstrap migrates, seeds the roles and the demo login, and loads the
+    # worked demo project — but only when the database has no project yet, so
+    # a restart never overwrites data you have entered.
+    command: sh -c "python manage.py bootstrap && python manage.py runserver 0.0.0.0:8000"
     volumes: [".:/app"]
     ports: ["8000:8000"]
     env_file: [.env]

@@ -64,15 +64,26 @@ Nine **structural** things changed, because building from scratch removes the co
 
 ## Running it
 
-Requires Docker, or a local PostgreSQL 16 and Redis.
+Requires Docker Desktop and nothing else — no Python, no PostgreSQL, no Redis
+installed on your machine.
 
 ```bash
-cp .env.example .env
-docker compose up --build      # or: make up
-make migrate
-make seed                      # demo login + a worked project from the real BOQs
-make run                       # http://localhost:8000  —  demo / discern2026
+make up          # http://localhost:8000  —  demo / discern2026
 ```
+
+That builds the images, starts PostgreSQL and Redis, migrates the schema, seeds
+the twelve roles and the demo login, and loads a worked project from Discern's
+real LINAC Building BOQ files. First run takes a few minutes; later runs start
+in seconds.
+
+`make up` is safe to repeat. The demo project is loaded **only when the database
+has no project yet**, so restarting never overwrites data you have entered. To
+start clean, `make reset` (deletes the database volume) then `make up`.
+
+`make down` stops the stack and keeps the data.
+
+Step-by-step instructions, including the no-Docker route and what to click once
+you are in, are in [`docs/RUNNING.md`](docs/RUNNING.md).
 
 Other targets: `make test` (264 tests), `make test-ceiling` (just the
 invariant the design rests on), `make demo` (terminal walkthrough).

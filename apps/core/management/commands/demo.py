@@ -18,6 +18,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
+from apps.accounts.capabilities import FINAL_APPROVALS
 from apps.accounts.models import AppUser, Role
 from apps.core.models import BoqLine, Item, ItemCategory, Location, Project
 from apps.inventory import services as inventory
@@ -87,8 +88,12 @@ class Command(BaseCommand):
         stamp = timezone.now().strftime("%H%M%S%f")
 
         def role(code, caps):
+            # Deliberately namespaced and stamped: `seed_roles` owns the real
+            # role codes, and `get_or_create` on a shared code would silently
+            # hand back the seeded role and ignore `defaults` — so the demo
+            # would inherit whoever the seeded role happens to be today.
             r, _ = Role.objects.get_or_create(
-                code=code,
+                code=f"demo_{code}_{stamp}",
                 defaults={"name": code.replace("_", " ").title(), "capabilities": caps},
             )
             return r
@@ -99,22 +104,25 @@ class Command(BaseCommand):
             return u
 
         return {
-            "sales_mgr": user("sales_manager", ["order:approve_kickoff"]),
-            "pm": user("project_manager", ["project:extend_schedule", "boq_revision:release"]),
+            # Every final signature is the CEO's. The managers below prepare the
+            # work and hand it up; none of them can approve their own.
+            "ceo": user("ceo", list(FINAL_APPROVALS)),
+            "sales_mgr": user("sales_manager", ["order:confirm"]),
+            "pm": user("project_manager", ["project:plan_schedule"]),
             "design_mgr": user("design_manager", ["fabrication:manage"]),
             "buyer": user("procurement_officer", ["procurement:rfq", "purchase_order:create"]),
             "site_engineer": user("site_engineer", [
                 "receipt:verify", "receipt:return", "stock:flag_excess", "expenses:submit",
+                "service_order:progress",
             ]),
             "store": user("store_keeper", ["receipt:record"]),
             "construction_mgr": user("construction_manager", [
                 "service_order:issue", "service_order:progress",
-                "service_order:certify", "expenses:approve",
             ]),
             "purchase_mgr": user("purchase_manager", [
                 "stock:transfer",
                 "procurement:rfq", "procurement:award",
-                "purchase_order:create", "purchase_order:approve",
+                "purchase_order:create",
             ]),
             "admin": AppUser.objects.create(
                 username=f"admin-{stamp}", email="admin@discern.test", is_administrator=True
@@ -175,7 +183,7 @@ class Command(BaseCommand):
 
         self.h2("The Sales Manager approves")
         with transaction.atomic():
-            sales.approve_for_kickoff(order=order, actor=who["sales_mgr"])
+            sales.approve_for_kickoff(order=order, actor=who["ceo"])
         self.ok("OrderApprovedForKickoff emitted to the outbox")
         pending = OutboxEvent.objects.filter(status=OutboxEvent.PENDING).count()
         self.note(f"Pending events: {pending} — nothing has run yet")
@@ -230,7 +238,7 @@ class Command(BaseCommand):
         projects.extend_commitment(
             project=project, new_committed_date=committed_date + timedelta(days=45),
             client_agreement_reference="Client letter ref IPGME&R/EXT/2026-11 dated 02.11.2026",
-            actor=who["pm"],
+            actor=who["ceo"],
         )
         project.refresh_from_db()
         self.ok(f"Committed date extended to {project.effective_committed_date}")
@@ -259,7 +267,7 @@ class Command(BaseCommand):
 
         self.h2("Project Manager releases Rev 0")
         with transaction.atomic():
-            boq.release_revision(revision=rev0, actor=who["pm"])
+            boq.release_revision(revision=rev0, actor=who["ceo"])
         events.drain()
         rev0.refresh_from_db()
         self.ok(f"Released and locked at {rev0.locked_at:%Y-%m-%d %H:%M}")
@@ -324,7 +332,7 @@ class Command(BaseCommand):
             revision_number=1, lot=fire, signed_off_by=who["design_mgr"],
         )
         with transaction.atomic():
-            boq.release_revision(revision=rev1, actor=who["pm"])
+            boq.release_revision(revision=rev1, actor=who["ceo"])
         events.drain()
         self.ok("Rev 1 released — reconciliation ran automatically on the event")
 
@@ -398,16 +406,18 @@ class Command(BaseCommand):
         self.note("stated as the Purchase Manager's prerogative and is honoured.")
         self.note("The comparison seen at that moment is frozen onto the award.")
 
-        order = procurement.create_purchase_order(awards=[award], actor=who["purchase_mgr"])
-        order.lines.update(item=item)
-        procurement.submit_purchase_order(order=order, actor=who["purchase_mgr"])
+        # Named `po`, not `order`: `order` is the client sales order and is
+        # still needed further down for invoicing.
+        po = procurement.create_purchase_order(awards=[award], actor=who["purchase_mgr"])
+        po.lines.update(item=item)
+        procurement.submit_purchase_order(order=po, actor=who["purchase_mgr"])
         events.drain()
-        self.ok(f"{order.number} confirmed — {n(award.awarded_qty)} {target.uom} at ₹{award.awarded_rate:,.0f}")
+        self.ok(f"{po.number} confirmed — {n(award.awarded_qty)} {target.uom} at ₹{award.awarded_rate:,.0f}")
 
         # ============================================ 6c. RECEIPT
         self.h1("8.  RECEIPT — nothing becomes cost until it is verified")
 
-        po_line = order.lines.first()
+        po_line = po.lines.first()
         receipt = inventory.record_receipt(
             purchase_order_line=po_line, quantity=Decimal("20"),
             actor=who["store"], vendor_challan="CH-4471",
@@ -467,7 +477,7 @@ class Command(BaseCommand):
         boq.sign_off_section(section=goods, actor=who["design_mgr"])
         boq.sign_off_section(section=service, actor=who["construction_mgr"])
         with transaction.atomic():
-            boq.release_revision(revision=rev2, actor=who["pm"])
+            boq.release_revision(revision=rev2, actor=who["ceo"])
         events.drain()
         self.ok("Rev 2 released — both sections signed, this time by two people")
         self.note("The Service section is no longer 'not applicable'.")
@@ -517,7 +527,7 @@ class Command(BaseCommand):
         self.row("Subcontract cost", f"₹{costing.project_total(project.pk, CostEntry.SUBCONTRACT):,.0f}", widths=(24, 30))
 
         cert = subs.certify(
-            order=service_order, quantity=Decimal("200"), actor=who["construction_mgr"]
+            order=service_order, quantity=Decimal("200"), actor=who["ceo"]
         )
         events.drain()
         self.ok(f"Running bill RA-{cert.running_bill_number} certified for 200 sqm")
@@ -558,7 +568,7 @@ class Command(BaseCommand):
                 project=project, category=category, amount=Decimal(amount),
                 expense_date=date.today(), actor=who["site_engineer"],
             )
-            finance.approve_expense(expense=expense, actor=who["construction_mgr"])
+            finance.approve_expense(expense=expense, actor=who["ceo"])
         events.drain()
         self.ok(f"₹{costing.project_total(project.pk, CostEntry.SITE_EXPENSE):,.0f} of site running costs approved")
         self.note("Outside the BOQ entirely, but in the same ledger as material and")

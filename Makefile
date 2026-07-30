@@ -1,10 +1,19 @@
-.PHONY: up down migrate test shell worker
+.PHONY: up down reset env migrate test shell worker bootstrap
 
-up:        ## Start the stack
+up: env    ## Start everything — database, app, worker — at http://localhost:8000
 	docker compose up --build
 
-down:
+down:      ## Stop the stack, keep the data
 	docker compose down
+
+reset:     ## Stop and delete the database volume, so the next `make up` reloads the demo
+	docker compose down -v
+
+env:       ## Create .env from .env.example if it does not exist yet
+	@test -f .env || (cp .env.example .env && echo "created .env from .env.example")
+
+bootstrap: ## Migrate, seed roles and login, load the demo project if empty
+	python manage.py bootstrap
 
 migrate:
 	python manage.py migrate

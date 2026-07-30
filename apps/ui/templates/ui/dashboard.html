@@ -1,0 +1,42 @@
+{% extends "ui/base.html" %}
+{% load money %}
+{% block title %}Dashboard · Discern{% endblock %}
+{% block content %}
+<h1>Portfolio</h1>
+<p class="sub">Live position across every active project. Every figure is a query over the cost ledger.</p>
+
+<div class="tiles">
+  <div><span class="n">{{ revenue|rupees }}</span><span class="k">Invoiced</span></div>
+  <div><span class="n">{{ cost|rupees }}</span><span class="k">Cost incurred</span></div>
+  <div><span class="n">{{ margin|rupees }}</span><span class="k">Margin</span></div>
+  <div><span class="n">{{ open_orders }}</span><span class="k">Awaiting kickoff</span></div>
+  <div><span class="n">{{ open_leads }}</span><span class="k">Open leads</span></div>
+  <div><span class="n">{{ dead_letters }}</span><span class="k">Failed hand-offs</span></div>
+</div>
+
+<div class="card">
+  <h2>Projects</h2>
+  <div class="scroll"><table>
+    <thead><tr>
+      <th>Project</th><th>Client</th><th>BOQ</th><th class="num">Invoiced</th>
+      <th class="num">Cost</th><th class="num">Margin</th><th class="num">%</th><th>Schedule</th>
+    </tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td><a href="{% url 'project_detail' r.project.pk %}">{{ r.project.code }}</a></td>
+        <td>{{ r.project.client.name|default:"—" }}</td>
+        <td>{% if r.boq %}<span class="pill mute">Rev {{ r.boq.revision_number }}</span>{% else %}<span class="pill mute">none</span>{% endif %}</td>
+        <td class="num">{{ r.revenue|rupees }}</td>
+        <td class="num">{{ r.cost|rupees }}</td>
+        <td class="num">{{ r.margin|rupees }}</td>
+        <td class="num">{% if r.pct %}{{ r.pct|floatformat:1 }}%{% else %}—{% endif %}</td>
+        <td>{% if r.overdue %}<span class="pill no">{{ r.overdue }} overdue</span>{% else %}<span class="pill ok">on track</span>{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="8" class="empty">No projects yet. Confirm an order and approve it for kickoff.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

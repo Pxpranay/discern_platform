@@ -1,0 +1,72 @@
+{% extends "ui/base.html" %}
+{% load money %}
+{% block title %}{{ order.number }} · Discern{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'orders' %}">Orders</a> / {{ order.number }}</p>
+<h1>{{ order.number }}</h1>
+<p class="sub">{{ order.client.name }}</p>
+
+<div class="grid g2">
+  <div class="card"><h2>Order</h2><div class="body">
+    <dl class="kv">
+      <dt>Status</dt><dd>
+        {% if order.status == 'kicked_off' %}<span class="pill ok">Kicked off</span>
+        {% elif order.status == 'held_pending_review' %}<span class="pill warn">Awaiting kickoff approval</span>
+        {% else %}<span class="pill mute">{{ order.get_status_display }}</span>{% endif %}</dd>
+      <dt>Value</dt><dd>{{ order.total_value|rupees }}</dd>
+      <dt>Committed</dt><dd>{{ order.committed_delivery_date|default:"not set" }}</dd>
+      <dt>Confirmed</dt><dd>{{ order.confirmed_at|date:"Y-m-d H:i"|default:"—" }}</dd>
+      <dt>Project</dt><dd>{% if project %}<a href="{% url 'project_detail' project.pk %}">{{ project.code }}</a>{% else %}not created{% endif %}</dd>
+    </dl>
+  </div></div>
+
+  <div class="card"><h2>Actions</h2><div class="body">
+    {% if order.status == 'draft' %}
+      <form method="post" class="inline">{% csrf_token %}
+        <input type="hidden" name="action" value="confirm">
+        <div><label for="cdd">Committed delivery date</label>
+          <input id="cdd" type="date" name="committed_delivery_date" required></div>
+        <button class="btn" type="submit">Confirm order</button>
+      </form>
+      <p class="sub" style="margin:.75rem 0 0;font-size:.85rem">This date becomes the hard ceiling on the project schedule.</p>
+    {% elif order.status == 'held_pending_review' %}
+      <form method="post" style="display:inline">{% csrf_token %}
+        <input type="hidden" name="action" value="kickoff">
+        <button class="btn" type="submit">Approve for kickoff</button>
+      </form>
+      <p class="sub" style="margin:.75rem 0 0;font-size:.85rem">Creates the project, copies the lots and provisions the site stock location — automatically.</p>
+    {% else %}
+      <p class="sub" style="margin:0">Kicked off. Changes now go through a change order.</p>
+    {% endif %}
+  </div></div>
+</div>
+
+<div class="card">
+  <h2>Lots</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>Lot</th><th>Kind</th><th class="num">Price</th><th>Project</th></tr></thead>
+    <tbody>
+    {% for l in lots %}
+      <tr><td class="num">{{ l.sequence }}</td><td>{{ l.name }}</td>
+        <td>{% if l.kind == 'lump_sum_sitc' %}<span class="pill warn">lump-sum SITC</span>{% else %}<span class="pill mute">itemized</span>{% endif %}</td>
+        <td class="num">{{ l.price|rupees }}</td>
+        <td>{% if l.project %}{{ l.project.code }}{% else %}—{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="5" class="empty">No lots.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+
+<div class="card">
+  <h2>Invoices</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Number</th><th>Lot</th><th class="num">Date</th><th class="num">Amount</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for i in invoices %}
+      <tr><td>{{ i.number }}</td><td>{{ i.lot.name }}</td><td class="num">{{ i.invoice_date }}</td>
+        <td class="num">{{ i.amount|rupees }}</td>
+        <td><span class="pill {% if i.status == 'issued' %}ok{% else %}mute{% endif %}">{{ i.get_status_display }}</span></td></tr>
+    {% empty %}<tr><td colspan="5" class="empty">Nothing invoiced yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

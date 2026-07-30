@@ -1,0 +1,113 @@
+{% extends "ui/base.html" %}
+{% load money %}
+{% block title %}{{ revision.project.code }} Rev {{ revision.revision_number }} · Discern{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'boq_list' %}">BOQ</a> / <a href="{% url 'project_detail' revision.project.pk %}">{{ revision.project.code }}</a> / Rev {{ revision.revision_number }}</p>
+<h1>BOQ Rev {{ revision.revision_number }}</h1>
+<p class="sub">{{ revision.project.name }}
+  {% if revision.is_released %}<span class="pill ok">released {{ revision.released_at|date:"Y-m-d" }} by {{ revision.released_by.username }}</span>
+  {% else %}<span class="pill warn">{{ revision.get_status_display }}</span>{% endif %}
+</p>
+
+{% if revision.is_released %}
+<div class="msg info" style="margin-bottom:1.25rem">This revision is locked. Changes go through a new revision, or an Administrator override.</div>
+{% endif %}
+
+{% for s in sections %}
+<div class="card">
+  <h2>{{ s.section.get_discipline_display }} section
+    {% if s.section.is_not_applicable %}<span class="pill mute" style="margin-left:.5rem">not applicable</span>
+    {% elif s.section.signed_off_at %}<span class="pill ok" style="margin-left:.5rem">signed off by {{ s.section.signed_off_by.username }}</span>
+    {% else %}<span class="pill warn" style="margin-left:.5rem">awaiting sign-off</span>{% endif %}
+  </h2>
+  <div class="scroll"><table>
+    <thead><tr><th>SL</th><th>Description</th><th>Route</th><th>Lot</th><th class="num">Qty</th><th>Unit</th><th class="num">Committed</th><th>Headroom</th></tr></thead>
+    <tbody>
+    {% for row in s.lines %}
+      <tr>
+        <td class="num">{{ row.line.sl_no|default:"—" }}</td>
+        <td>{{ row.line.description }}</td>
+        <td><span class="pill mute">{{ row.line.route }}</span></td>
+        <td style="font-size:.82rem;color:var(--grey)">{{ row.line.lot.name|default:"—" }}</td>
+        <td class="num">{{ row.line.quantity|qty }}</td>
+        <td>{{ row.line.uom }}</td>
+        <td class="num">{{ row.committed|qty }}</td>
+        <td>{% if row.headroom <= 0 %}<span class="pill no">full</span>{% else %}<span class="pill ok">{{ row.headroom|qty }} left</span>{% endif %}</td>
+      </tr>
+    {% empty %}<tr><td colspan="8" class="empty">No lines in this section.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+
+  {% if not revision.is_released %}
+  <div class="body" style="border-top:1px solid var(--hair)">
+    <form method="post" class="inline" style="margin-bottom:.9rem">{% csrf_token %}
+      <input type="hidden" name="action" value="add_line">
+      <input type="hidden" name="section_id" value="{{ s.section.pk }}">
+      <div><label>SL</label><input name="sl_no" style="width:4.5rem"></div>
+      <div style="flex:1;min-width:14rem"><label>Description</label><input name="description" required style="width:100%"></div>
+      <div><label>Qty</label><input name="quantity" required style="width:6rem"></div>
+      <div><label>Unit</label><input name="uom" value="nos" style="width:5rem"></div>
+      <div><label>Route</label><select name="route">{% for v, l in routes %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+      <div><label>Lot</label><select name="lot"><option value="">—</option>{% for lot in lots %}<option value="{{ lot.pk }}">{{ lot.name }}</option>{% endfor %}</select></div>
+      <button class="btn sec" type="submit">Add line</button>
+    </form>
+
+    {% if not s.section.is_complete %}
+    <form method="post" style="display:inline">{% csrf_token %}
+      <input type="hidden" name="action" value="sign_off"><input type="hidden" name="section_id" value="{{ s.section.pk }}">
+      <button class="btn" type="submit">Sign off {{ s.section.get_discipline_display|lower }} section</button>
+    </form>
+    <form method="post" style="display:inline;margin-left:.4rem">{% csrf_token %}
+      <input type="hidden" name="action" value="not_applicable"><input type="hidden" name="section_id" value="{{ s.section.pk }}">
+      <button class="btn sec" type="submit">No scope — mark not applicable</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% if not revision.is_released %}
+<div class="card"><h2>Release</h2><div class="body">
+  {% if can_release %}
+    <form method="post" style="display:inline">{% csrf_token %}
+      <input type="hidden" name="action" value="release">
+      <button class="btn" type="submit">Release revision</button>
+    </form>
+    <p class="sub" style="margin:.75rem 0 0;font-size:.85rem">Locks the revision and runs reconciliation against the commitment and stock ledgers.</p>
+  {% else %}
+    <p class="sub" style="margin:0">Both sections must be signed off — or marked not applicable — before release.</p>
+  {% endif %}
+  <form method="post" class="inline" style="margin-top:1rem">{% csrf_token %}
+    <input type="hidden" name="action" value="send_back">
+    <div style="flex:1"><label>Send back with a reason</label><input name="reason" placeholder="quantities need checking against the drawings" style="width:100%"></div>
+    <button class="btn danger" type="submit">Send back</button>
+  </form>
+</div></div>
+{% endif %}
+
+{% if outcomes %}
+<div class="card">
+  <h2>Reconciliation — {{ acting|length }} of {{ outcomes|length }} lines need action</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Description</th><th class="num">Previous</th><th class="num">New</th><th class="num">Delta</th><th>Outcome</th><th>Action</th></tr></thead>
+    <tbody>
+    {% for o in outcomes %}
+      <tr {% if o.action == 'none' %}style="color:var(--grey)"{% endif %}>
+        <td>{{ o.description }}</td>
+        <td class="num">{{ o.previous_qty|qty }}</td>
+        <td class="num">{{ o.new_qty|qty }}</td>
+        <td class="num">{% if o.delta > 0 %}+{% endif %}{{ o.delta|qty }}</td>
+        <td><span class="pill {% if o.action == 'none' %}mute{% elif o.action == 'return_queue' %}no{% else %}warn{% endif %}">{{ o.get_kind_display }}</span></td>
+        <td style="font-size:.84rem">
+          {{ o.get_action_display }}
+          {% if o.excess_received %}<br><span style="color:var(--block)">return {{ o.excess_received|qty }}</span>{% endif %}
+          {% if o.order_reduction %}<br><span style="color:var(--warn)">cancel {{ o.order_reduction|qty }}</span>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endif %}
+{% endblock %}

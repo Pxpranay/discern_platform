@@ -1,0 +1,24 @@
+{% extends "ui/base.html" %}
+{% block title %}BOQ · Discern{% endblock %}
+{% block content %}
+<h1>Bills of Quantities</h1>
+<p class="sub">One revision per BOQ, with a Goods section and a Service section.</p>
+<div class="card">
+  <h2>Revisions</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Project</th><th>Rev</th><th class="num">Lines</th><th>Status</th><th class="num">Prepared</th><th>Released by</th></tr></thead>
+    <tbody>
+    {% for r in revisions %}
+      <tr><td><a href="{% url 'project_detail' r.project.pk %}">{{ r.project.code }}</a></td>
+        <td><a href="{% url 'boq_detail' r.pk %}">Rev {{ r.revision_number }}</a></td>
+        <td class="num">{{ r.line_count }}</td>
+        <td>{% if r.status == 'released' %}<span class="pill ok">released</span>
+            {% elif r.status == 'sections_signed' %}<span class="pill warn">ready to release</span>
+            {% else %}<span class="pill mute">{{ r.get_status_display }}</span>{% endif %}</td>
+        <td class="num">{{ r.prepared_at|date:"Y-m-d" }}</td>
+        <td>{{ r.released_by.username|default:"—" }}</td></tr>
+    {% empty %}<tr><td colspan="6" class="empty">No BOQ revisions yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

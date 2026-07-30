@@ -6,7 +6,7 @@ Integrated operations platform for Discern Engineering Pvt Ltd — a purpose-bui
 Enquiry → Sales → Project → BOQ → Procurement → Fabrication / Subcontract → Receipt → Costing
 ```
 
-**Status: design under review. Phases 0, 1 and 2 built and tested — 131 tests passing.**
+**Status: working application covering Phases 0–2. 131 tests passing. Sign in with `demo` / `discern2026`.**
 
 ---
 
@@ -69,9 +69,26 @@ Requires Docker, or a local PostgreSQL 16 and Redis.
 cp .env.example .env
 docker compose up --build      # or: make up
 make migrate
-make test                      # 131 tests
-make test-ceiling              # just the invariant the design rests on
+make seed                      # demo login + a worked project from the real BOQs
+make run                       # http://localhost:8000  —  demo / discern2026
 ```
+
+Other targets: `make test` (131 tests), `make test-ceiling` (just the
+invariant the design rests on), `make demo` (terminal walkthrough).
+
+### Screens
+
+| Screen | What you can do |
+|---|---|
+| **Dashboard** | Portfolio margin, per-project revenue/cost/margin, schedule alerts |
+| **CRM** | Lead list with assignment, opportunity pipeline, follow-up due |
+| **Sales** | Orders and lots; confirm an order, approve it for kickoff |
+| **Projects** | Margin by SITC lot, cost by category, master schedule, record an extension, open the next BOQ revision |
+| **BOQ** | Both sections with live committed/headroom per line, add lines, sign off, mark not applicable, release, send back, and the reconciliation verdicts |
+
+Every button calls the same domain service the tests exercise. A view never
+writes a model directly, so the quantity ceiling, the schedule cap and
+lock-on-approval hold in the UI exactly as they do in the tests.
 
 Without Docker, point `POSTGRES_HOST` / `POSTGRES_USER` / `POSTGRES_DB` at a
 local server and run `python -m pytest`.

@@ -1,0 +1,111 @@
+{% extends "ui/base.html" %}
+{% load money %}
+{% block title %}{{ project.code }} · Discern{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'projects' %}">Projects</a> / {{ project.code }}</p>
+<h1>{{ project.name }}</h1>
+<p class="sub">{{ project.client.name|default:"" }}{% if project.order %} · order <a href="{% url 'order_detail' project.order.pk %}">{{ project.order.number }}</a>{% endif %}</p>
+
+<div class="tiles">
+  <div><span class="n">{{ profit.revenue|rupees }}</span><span class="k">Invoiced</span></div>
+  <div><span class="n">{{ profit.cost|rupees }}</span><span class="k">Cost</span></div>
+  <div><span class="n">{{ profit.margin|rupees }}</span><span class="k">Margin</span></div>
+  <div><span class="n">{{ project.effective_committed_date|default:"—" }}</span><span class="k">Committed date</span></div>
+</div>
+
+<div class="grid g2">
+  <div class="card">
+    <h2>Margin by lot</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Lot</th><th class="num">Invoiced</th><th class="num">Cost</th><th class="num">Margin</th></tr></thead>
+      <tbody>
+      {% for lot, p in lot_profit %}
+        <tr><td>{{ lot.name }}</td><td class="num">{{ p.revenue|rupees }}</td>
+          <td class="num">{{ p.cost|rupees }}</td><td class="num">{{ p.margin|rupees }}</td></tr>
+      {% empty %}<tr><td colspan="4" class="empty">No lots.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="card">
+    <h2>Cost by category</h2>
+    <div class="body">
+      <dl class="kv">
+      {% for k, v in profit.by_category.items %}<dt>{{ k }}</dt><dd>{{ v|rupees }}</dd>{% empty %}<dd class="sub" style="margin:0">Nothing posted yet.</dd>{% endfor %}
+      </dl>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Master schedule</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>Phase</th><th>Kind</th><th class="num">Target</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for ph in phases %}
+      <tr>
+        <td class="num">{{ ph.sequence }}</td><td>{{ ph.name }}</td>
+        <td><span class="pill mute">{{ ph.get_kind_display }}</span></td>
+        <td class="num">{{ ph.planned_end }}</td>
+        <td>{% if ph.is_complete %}<span class="pill ok">complete</span>
+            {% elif ph.planned_end < today %}<span class="pill no">overdue</span>
+            {% else %}<span class="pill mute">planned</span>{% endif %}</td>
+      </tr>
+    {% empty %}<tr><td colspan="5" class="empty">No phases planned.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  <div class="body" style="border-top:1px solid var(--hair)">
+    <form method="post" class="inline">{% csrf_token %}
+      <input type="hidden" name="action" value="plan_phase">
+      <div><label for="pn">Phase name</label><input id="pn" name="name" required style="min-width:15rem"></div>
+      <div><label for="pk">Kind</label><select id="pk" name="kind">{% for v, l in phase_kinds %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+      <div><label for="pe">Target date</label><input id="pe" type="date" name="planned_end" required></div>
+      <div><label for="ps">Seq</label><input id="ps" type="number" name="sequence" value="1" style="width:5rem"></div>
+      <button class="btn" type="submit">Add phase</button>
+    </form>
+    <p class="sub" style="margin:.75rem 0 0;font-size:.84rem">A target date beyond {{ project.effective_committed_date|default:"the committed date" }} will be refused.</p>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Extend committed date</h2>
+  <div class="body">
+    <form method="post" class="inline">{% csrf_token %}
+      <input type="hidden" name="action" value="extend">
+      <div><label for="nd">New committed date</label><input id="nd" type="date" name="new_committed_date" required></div>
+      <div style="flex:1"><label for="ref">Client agreement reference</label><input id="ref" name="reference" required placeholder="e.g. client letter ref DE/EXT/17 dated 02.11.2026" style="width:100%"></div>
+      <button class="btn sec" type="submit">Record extension</button>
+    </form>
+    {% if extensions %}
+    <div class="scroll" style="margin-top:1rem"><table>
+      <thead><tr><th class="num">From</th><th class="num">To</th><th>Agreement</th><th>Authorised</th></tr></thead>
+      <tbody>{% for e in extensions %}<tr><td class="num">{{ e.previous_committed_date }}</td><td class="num">{{ e.new_committed_date }}</td>
+        <td>{{ e.client_agreement_reference }}</td><td>{{ e.authorized_by.username }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>BOQ revisions</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Rev</th><th class="num">Lines</th><th>Status</th><th class="num">Released</th><th>By</th></tr></thead>
+    <tbody>
+    {% for r in revisions %}
+      <tr><td><a href="{% url 'boq_detail' r.pk %}">Rev {{ r.revision_number }}</a></td>
+        <td class="num">{{ r.line_count }}</td>
+        <td>{% if r.status == 'released' %}<span class="pill ok">released</span>{% else %}<span class="pill warn">{{ r.get_status_display }}</span>{% endif %}</td>
+        <td class="num">{{ r.released_at|date:"Y-m-d"|default:"—" }}</td>
+        <td>{{ r.released_by.username|default:"—" }}</td></tr>
+    {% empty %}<tr><td colspan="5" class="empty">No BOQ yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  <div class="body" style="border-top:1px solid var(--hair)">
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="action" value="open_revision">
+      <button class="btn" type="submit">Open next revision</button>
+    </form>
+    <p class="sub" style="margin:.75rem 0 0;font-size:.84rem">Copies the last released revision forward, carrying line identity so the diff stays accurate.</p>
+  </div>
+</div>
+{% endblock %}

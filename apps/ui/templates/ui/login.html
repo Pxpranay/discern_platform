@@ -1,0 +1,18 @@
+{% extends "ui/base.html" %}
+{% block title %}Sign in · Discern{% endblock %}
+{% block content %}
+<div style="max-width:22rem;margin:3rem auto">
+  <h1>Sign in</h1>
+  <p class="sub">Discern Engineering operations platform.</p>
+  <div class="card"><div class="body">
+    <form method="post">
+      {% csrf_token %}
+      {% if form.errors %}<div class="msg error" style="margin-bottom:1rem">That username and password do not match.</div>{% endif %}
+      <div style="margin-bottom:.9rem"><label for="id_username">Username</label>{{ form.username }}</div>
+      <div style="margin-bottom:1.1rem"><label for="id_password">Password</label>{{ form.password }}</div>
+      <button class="btn" type="submit" style="width:100%">Sign in</button>
+    </form>
+  </div></div>
+  <p class="sub" style="font-size:.82rem">Demo login: <code>demo</code> / <code>discern2026</code></p>
+</div>
+{% endblock %}

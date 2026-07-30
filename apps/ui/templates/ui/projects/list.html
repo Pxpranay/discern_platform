@@ -1,0 +1,25 @@
+{% extends "ui/base.html" %}
+{% load money %}
+{% block title %}Projects · Discern{% endblock %}
+{% block content %}
+<h1>Projects</h1>
+<p class="sub">Every cost, commitment and stock movement is scoped to one of these.</p>
+<div class="card">
+  <h2>Active</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Code</th><th>Name</th><th>Client</th><th class="num">Budget</th><th class="num">Committed date</th><th class="num">Phases</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for p in projects %}
+      <tr>
+        <td><a href="{% url 'project_detail' p.pk %}">{{ p.code }}</a></td>
+        <td>{{ p.name }}</td><td>{{ p.client.name|default:"—" }}</td>
+        <td class="num">{{ p.budget|rupees }}</td>
+        <td class="num">{{ p.effective_committed_date|default:"—" }}</td>
+        <td class="num">{{ p.phases }}</td>
+        <td><span class="pill mute">{{ p.get_status_display }}</span></td>
+      </tr>
+    {% empty %}<tr><td colspan="7" class="empty">No projects yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "ui/base.html" %}
+{% load money %}
+{% block title %}CRM · Discern{% endblock %}
+{% block content %}
+<h1>CRM</h1>
+<p class="sub">Leads, the opportunity pipeline, and follow-up due.</p>
+
+<div class="card">
+  <h2>Pipeline</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Opportunity</th><th>Client</th><th>Owner</th><th>Stage</th><th class="num">Rough value</th><th class="num">Expected close</th></tr></thead>
+    <tbody>
+    {% for o in opportunities %}
+      <tr>
+        <td>{{ o.name }}</td>
+        <td>{{ o.client.name }}</td>
+        <td>{{ o.owner.username }}</td>
+        <td>
+          {% if o.stage == 'won' %}<span class="pill ok">Won</span>
+          {% elif o.stage == 'lost' %}<span class="pill no">Lost</span>
+          {% else %}<span class="pill mute">{{ o.get_stage_display }}</span>{% endif %}
+        </td>
+        <td class="num">{{ o.rough_order_value|rupees }}</td>
+        <td class="num">{{ o.expected_close|default:"—" }}</td>
+      </tr>
+    {% empty %}<tr><td colspan="6" class="empty">No opportunities yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+
+<div class="grid g2">
+  <div class="card">
+    <h2>Leads</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Client</th><th>Work type</th><th>Assigned</th><th>Stage</th></tr></thead>
+      <tbody>
+      {% for l in leads %}
+        <tr>
+          <td>{{ l.client_name }}<br><span style="color:var(--grey);font-size:.82rem">{{ l.site_location }}</span></td>
+          <td>{{ l.work_type|default:"—" }}</td>
+          <td>{{ l.assigned_to.username|default:"unassigned" }}</td>
+          <td><span class="pill mute">{{ l.get_stage_display }}</span></td>
+        </tr>
+      {% empty %}<tr><td colspan="4" class="empty">No leads yet.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="card">
+    <h2>Follow-up due</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Due</th><th>Opportunity</th><th>Type</th><th>Owner</th></tr></thead>
+      <tbody>
+      {% for a in activities %}
+        <tr><td class="num">{{ a.due_date }}</td><td>{{ a.opportunity.name }}</td>
+            <td>{{ a.get_activity_type_display }}</td><td>{{ a.assigned_to.username }}</td></tr>
+      {% empty %}<tr><td colspan="4" class="empty">Nothing outstanding.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "ui/base.html" %}
+{% load money %}
+{% block title %}Sales · Discern{% endblock %}
+{% block content %}
+<h1>Orders</h1>
+<p class="sub">A confirmed order waits at the kickoff gate. It does not create a project until someone approves it.</p>
+<div class="card">
+  <h2>Orders</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Number</th><th>Client</th><th class="num">Lots</th><th class="num">Value</th><th class="num">Committed delivery</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for o in orders %}
+      <tr>
+        <td><a href="{% url 'order_detail' o.pk %}">{{ o.number }}</a></td>
+        <td>{{ o.client.name }}</td>
+        <td class="num">{{ o.lot_count }}</td>
+        <td class="num">{{ o.total_value|rupees }}</td>
+        <td class="num">{{ o.committed_delivery_date|default:"—" }}</td>
+        <td>
+          {% if o.status == 'kicked_off' %}<span class="pill ok">Kicked off</span>
+          {% elif o.status == 'held_pending_review' %}<span class="pill warn">Awaiting kickoff</span>
+          {% else %}<span class="pill mute">{{ o.get_status_display }}</span>{% endif %}
+        </td>
+      </tr>
+    {% empty %}<tr><td colspan="6" class="empty">No orders yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

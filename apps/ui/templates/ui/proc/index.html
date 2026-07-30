@@ -1,0 +1,45 @@
+{% extends "ui/base.html" %}{% load money %}
+{% block title %}Procurement · Discern{% endblock %}
+{% block content %}
+<h1>Procurement</h1>
+<p class="sub">Every purchase need arrives as the same record, whatever raised it.</p>
+
+<div class="card"><h2>Requests</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Number</th><th>Project</th><th>Source</th><th class="num">Lines</th><th>Status</th></tr></thead>
+  <tbody>{% for r in requests %}
+    <tr><td><a href="{% url 'request_detail' r.pk %}">{{ r.number }}</a></td>
+      <td>{{ r.project.code }}</td>
+      <td>{{ r.get_source_display }}{% if r.is_site_raised %} <span class="pill warn">site-raised</span>{% endif %}</td>
+      <td class="num">{{ r.line_count }}</td>
+      <td>{% if r.status == 'approved' %}<span class="pill ok">approved</span>
+          {% elif r.status == 'awaiting_approval' %}<span class="pill warn">awaiting PM</span>
+          {% elif r.status == 'held' %}<span class="pill no">held</span>
+          {% else %}<span class="pill mute">{{ r.get_status_display }}</span>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="5" class="empty">Nothing requested yet. Release a BOQ revision.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+
+<div class="grid g2">
+  <div class="card"><h2>RFQs</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Number</th><th class="num">Vendors</th><th class="num">Replied</th><th>Status</th></tr></thead>
+    <tbody>{% for q in rfqs %}
+      <tr><td><a href="{% url 'rfq_detail' q.pk %}">{{ q.number }}</a></td>
+        <td class="num">{{ q.vendor_count }}</td><td class="num">{{ q.responded_count }}</td>
+        <td>{% if q.status == 'awarded' %}<span class="pill ok">awarded</span>{% else %}<span class="pill mute">{{ q.get_status_display }}</span>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4" class="empty">No RFQs.</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+
+  <div class="card"><h2>Purchase orders</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Number</th><th>Vendor</th><th class="num">Value</th><th>Status</th></tr></thead>
+    <tbody>{% for o in orders %}
+      <tr><td><a href="{% url 'po_detail' o.pk %}">{{ o.number }}</a></td><td>{{ o.vendor.name }}</td>
+        <td class="num">{{ o.total_value|rupees }}</td>
+        <td>{% if o.status == 'confirmed' %}<span class="pill ok">confirmed</span>
+            {% elif o.status == 'awaiting_approval' %}<span class="pill warn">awaiting approval</span>
+            {% else %}<span class="pill mute">{{ o.get_status_display }}</span>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4" class="empty">No orders.</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+</div>
+{% endblock %}

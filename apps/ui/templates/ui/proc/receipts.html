@@ -1,0 +1,57 @@
+{% extends "ui/base.html" %}{% load money %}
+{% block title %}Receipts · Discern{% endblock %}
+{% block content %}
+<h1>Receipts</h1>
+<p class="sub">The Store Keeper records what arrived. A Site Engineer verifies it — and <b>only then</b> does cost enter the project.</p>
+
+<div class="card"><h2>Awaited at site</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Order</th><th>Vendor</th><th>Description</th><th class="num">Expected</th><th>Location</th><th></th></tr></thead>
+  <tbody>{% for e in awaited %}
+    <tr><td><a href="{% url 'po_detail' e.purchase_order_line.purchase_order.pk %}">{{ e.purchase_order_line.purchase_order.number }}</a></td>
+      <td>{{ e.purchase_order_line.purchase_order.vendor.name }}</td>
+      <td>{{ e.purchase_order_line.description|truncatechars:38 }}</td>
+      <td class="num">{{ e.expected_qty|qty }}</td><td>{{ e.location.code }}</td>
+      <td style="text-align:right">
+        <form method="post" class="inline" style="justify-content:flex-end">{% csrf_token %}
+          <input type="hidden" name="action" value="record"><input type="hidden" name="line" value="{{ e.purchase_order_line.pk }}">
+          <input name="quantity" placeholder="qty" style="width:5rem" required>
+          <input name="challan" placeholder="challan no." style="width:8rem">
+          <button class="btn sec" type="submit">Record</button></form></td></tr>
+  {% empty %}<tr><td colspan="6" class="empty">Nothing awaited. Confirm a purchase order.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+
+<div class="card"><h2>Awaiting Site Engineer verification</h2>
+<div class="scroll"><table>
+  <thead><tr><th>GRN</th><th>Description</th><th class="num">Recorded</th><th>By</th><th>Verify</th></tr></thead>
+  <tbody>{% for r in recorded %}
+    <tr><td>{{ r.number }}</td><td>{{ r.purchase_order_line.description|truncatechars:34 }}</td>
+      <td class="num">{{ r.received_qty|qty }}</td><td>{{ r.received_by.username }}</td>
+      <td><form method="post" class="inline">{% csrf_token %}
+        <input type="hidden" name="action" value="verify"><input type="hidden" name="receipt" value="{{ r.pk }}">
+        <input name="accepted" placeholder="accepted" style="width:5.5rem" required>
+        <input name="rejected" placeholder="rejected" style="width:5.5rem">
+        <input name="notes" placeholder="discrepancy notes" style="width:11rem">
+        <button class="btn" type="submit">Verify</button></form></td></tr>
+  {% empty %}<tr><td colspan="5" class="empty">Nothing awaiting verification.</td></tr>{% endfor %}</tbody>
+</table></div>
+<div class="body" style="border-top:1px solid var(--hair)">
+  <p class="sub" style="margin:0;font-size:.85rem">A rejected quantity logs a discrepancy that holds the vendor bill, and frees the BOQ headroom so a replacement can be ordered.</p>
+</div></div>
+
+<div class="card"><h2>Verified</h2>
+<div class="scroll"><table>
+  <thead><tr><th>GRN</th><th>Description</th><th class="num">Accepted</th><th class="num">Rejected</th><th>Status</th><th>Return</th></tr></thead>
+  <tbody>{% for r in recent %}
+    <tr><td>{{ r.number }}</td><td>{{ r.purchase_order_line.description|truncatechars:30 }}</td>
+      <td class="num">{{ r.verification.accepted_qty|qty }}</td>
+      <td class="num">{{ r.verification.rejected_qty|qty }}</td>
+      <td>{% if r.status == 'verified' %}<span class="pill ok">verified</span>{% else %}<span class="pill no">discrepancy</span>{% endif %}</td>
+      <td><form method="post" class="inline">{% csrf_token %}
+        <input type="hidden" name="action" value="return"><input type="hidden" name="receipt" value="{{ r.pk }}">
+        <input name="quantity" placeholder="qty" style="width:5rem" required>
+        <input name="reason" placeholder="reason" style="width:9rem" required>
+        <button class="btn sec" type="submit">Return</button></form></td></tr>
+  {% empty %}<tr><td colspan="6" class="empty">Nothing verified yet.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% endblock %}

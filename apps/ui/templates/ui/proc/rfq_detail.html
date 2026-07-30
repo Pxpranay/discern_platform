@@ -1,0 +1,77 @@
+{% extends "ui/base.html" %}{% load money %}
+{% block title %}{{ rfq.number }} · Discern{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'procurement_home' %}">Procurement</a> / <a href="{% url 'request_detail' rfq.request.pk %}">{{ rfq.request.number }}</a> / {{ rfq.number }}</p>
+<h1>{{ rfq.number }}</h1>
+<p class="sub">{{ rfq.vendors.count }} vendor(s) · {{ rfq.responded_count }} replied
+  {% if rfq.meets_minimum %}<span class="pill ok">meets the three-vendor rule</span>
+  {% else %}<span class="pill no">below three responses</span>{% endif %}</p>
+
+{% if rfq.min_vendors_waived_reason %}
+<div class="msg info" style="margin-bottom:1.25rem"><b>Fewer than three, with reason on record:</b> {{ rfq.min_vendors_waived_reason }}</div>
+{% endif %}
+
+{% if rfq.status == 'draft' %}
+<div class="card"><h2>Issue</h2><div class="body">
+  <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="issue">
+    <button class="btn" type="submit">Issue to vendors</button></form>
+  <form method="post" class="inline" style="margin-top:1rem">{% csrf_token %}<input type="hidden" name="action" value="waive">
+    <div style="flex:1"><label>Fewer than three vendors are capable — record why</label>
+      <input name="reason" style="width:100%" placeholder="only approved supplier for this specification"></div>
+    <button class="btn sec" type="submit">Record reason</button></form>
+</div></div>
+{% endif %}
+
+<div class="card"><h2>Record a quote</h2><div class="body">
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="quote">
+    <div style="margin-bottom:.75rem"><label>Vendor</label>
+      <select name="rfq_vendor">{% for rv in rfq.vendors.all %}<option value="{{ rv.pk }}">{{ rv.vendor.name }}{% if rv.responded_at %} (already quoted){% endif %}</option>{% endfor %}</select></div>
+    {% for row in statement %}
+    <div style="margin-bottom:.5rem"><label>{{ row.line.description }} — {{ row.line.quantity|qty }} {{ row.line.uom }}</label>
+      <input name="rate_{{ row.line.pk }}" placeholder="rate per {{ row.line.uom }}" style="width:12rem"></div>
+    {% endfor %}
+    <button class="btn" type="submit" style="margin-top:.5rem">Save quote</button>
+  </form>
+</div></div>
+
+{% for row in statement %}
+<div class="card">
+  <h2>{{ row.line.description }} — {{ row.line.quantity|qty }} {{ row.line.uom }}</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Vendor</th><th class="num">Rate</th><th class="num">Amount</th><th class="num">Delivery</th><th>Terms</th><th></th></tr></thead>
+    <tbody>{% for q in row.quotes %}
+      <tr><td>{{ q.vendor.name }}
+            {% if q.is_best_price %}<span class="pill ok">lowest</span>{% endif %}
+            {% if q.is_best_delivery %}<span class="pill mute">earliest</span>{% endif %}</td>
+        <td class="num">{{ q.rate|rupees }}</td><td class="num">{{ q.amount|rupees }}</td>
+        <td class="num">{{ q.delivery_date|default:"—" }}</td><td>{{ q.terms|default:"—" }}</td>
+        <td style="text-align:right">
+          {% if row.awarded %}{% if row.awarded.winning_vendor_id == q.vendor.pk %}<span class="pill ok">awarded</span>{% endif %}
+          {% else %}
+          <form method="post">{% csrf_token %}<input type="hidden" name="action" value="award">
+            <input type="hidden" name="line" value="{{ row.line.pk }}"><input type="hidden" name="vendor" value="{{ q.vendor.pk }}">
+            <button class="btn sec" type="submit">Award</button></form>
+          {% endif %}</td></tr>
+    {% empty %}<tr><td colspan="6" class="empty">No quotes yet.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <div class="body" style="border-top:1px solid var(--hair)">
+    <p class="sub" style="margin:0;font-size:.85rem">Lowest and earliest are marked <b>for information only</b>. Any vendor may be awarded, irrespective of price — no justification is required.</p>
+  </div>
+</div>
+{% endfor %}
+
+{% if awards %}
+<div class="card"><h2>Awarded — raise the order</h2>
+  <form method="post"><div class="body">{% csrf_token %}<input type="hidden" name="action" value="raise_po">
+    {% for a in awards %}
+    <label style="display:flex;gap:.6rem;align-items:baseline;text-transform:none;letter-spacing:0;font-family:var(--sans);font-size:.9rem;color:var(--ink);margin-bottom:.5rem">
+      <input type="checkbox" name="awards" value="{{ a.pk }}" checked>
+      <span>{{ a.request_line.description }} — {{ a.awarded_qty|qty }} @ {{ a.awarded_rate|rupees }} · <b>{{ a.winning_vendor.name }}</b>
+        {% if a.was_lowest is False %}<span class="pill warn">above lowest</span>{% endif %}</span></label>
+    {% endfor %}
+    <button class="btn" type="submit" style="margin-top:.5rem">Raise purchase order</button>
+    <p class="sub" style="margin:.6rem 0 0;font-size:.84rem">One order per vendor. The BOQ ceiling is checked as it is raised.</p>
+  </div></form>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "ui/base.html" %}{% load money %}
+{% block title %}{{ pr.number }} · Discern{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'procurement_home' %}">Procurement</a> / {{ pr.number }}</p>
+<h1>{{ pr.number }}</h1>
+<p class="sub">{{ pr.project.code }} · {{ pr.get_source_display }}
+  {% if pr.is_site_raised %}<span class="pill warn">site-raised</span>{% endif %}
+  {% if pr.status == 'awaiting_approval' %}<span class="pill warn">awaiting Project Manager</span>
+  {% elif pr.status == 'held' %}<span class="pill no">held</span>
+  {% else %}<span class="pill ok">{{ pr.get_status_display }}</span>{% endif %}</p>
+
+{% if pr.status == 'awaiting_approval' %}
+<div class="card"><h2>Project Manager decision</h2><div class="body">
+  <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="approve">
+    <button class="btn" type="submit">Approve</button></form>
+  <form method="post" class="inline" style="margin-top:1rem">{% csrf_token %}
+    <input type="hidden" name="action" value="hold">
+    <div style="flex:1"><label>Hold, with a reason</label><input name="reason" style="width:100%" placeholder="wait for the next BOQ cycle"></div>
+    <button class="btn danger" type="submit">Hold</button></form>
+</div></div>
+{% endif %}
+
+<div class="card"><h2>Lines — with stock already held elsewhere</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Description</th><th class="num">Qty</th><th>Unit</th><th class="num">On hand elsewhere</th><th>Last purchase</th></tr></thead>
+  <tbody>{% for row in lines %}
+    <tr><td>{{ row.line.description }}</td><td class="num">{{ row.line.quantity|qty }}</td><td>{{ row.line.uom }}</td>
+      <td class="num">{% if row.availability.total_on_hand %}<span class="pill warn">{{ row.availability.total_on_hand|qty }}</span>{% else %}—{% endif %}</td>
+      <td style="font-size:.84rem">{% if row.availability.last_purchase.rate %}{{ row.availability.last_purchase.rate|rupees }}
+        · {{ row.availability.last_purchase.at|date:"Y-m-d" }}<br>{{ row.availability.last_purchase.vendor.name }}{% else %}never bought{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+<div class="body" style="border-top:1px solid var(--hair)">
+  <p class="sub" style="margin:0;font-size:.85rem">Using stock already held, or buying fresh, is entirely the Purchase Manager's call. The platform shows what exists; it does not force either choice.</p>
+</div></div>
+
+{% if pr.status == 'approved' %}
+<div class="card"><h2>Send an RFQ</h2><div class="body">
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="rfq">
+    <p class="sub" style="margin:0 0 .75rem;font-size:.86rem">Discern's rule is at least three vendors per line.</p>
+    {% for v in vendors %}
+    <label style="display:inline-flex;gap:.4rem;align-items:center;text-transform:none;letter-spacing:0;font-family:var(--sans);font-size:.9rem;color:var(--ink);margin:0 1.25rem .5rem 0">
+      <input type="checkbox" name="vendors" value="{{ v.pk }}"> {{ v.name }}</label>
+    {% empty %}<p class="sub" style="margin:0">No vendors on file yet.</p>{% endfor %}
+    <div style="margin-top:.75rem"><button class="btn" type="submit">Create RFQ</button></div>
+  </form>
+</div></div>
+{% endif %}
+
+{% if rfqs %}
+<div class="card"><h2>RFQs raised</h2><div class="scroll"><table><tbody>
+{% for q in rfqs %}<tr><td><a href="{% url 'rfq_detail' q.pk %}">{{ q.number }}</a></td><td>{{ q.get_status_display }}</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endif %}
+{% endblock %}

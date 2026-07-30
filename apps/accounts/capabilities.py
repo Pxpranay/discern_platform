@@ -31,6 +31,17 @@ CAPABILITIES: list[tuple[str, str, str, str]] = [
     ("boq:edit", "Add or change lines on a draft revision", "BOQ", ACTION),
     ("boq:sign_off", "Sign off a discipline section", "BOQ", ACTION),
     ("boq_revision:release", "Release a revision downstream (Project Manager)", "BOQ", ACTION),
+    ("procurement:view", "See procurement requests, RFQs and purchase orders", "Procurement", VIEW),
+    ("procurement:request", "Raise a site requisition", "Procurement", ACTION),
+    ("procurement:approve_request", "Approve a site-raised requisition (Project Manager)", "Procurement", ACTION),
+    ("procurement:rfq", "Create and issue an RFQ, and record quotes", "Procurement", ACTION),
+    ("procurement:award", "Award a line to a vendor, irrespective of price (Purchase Manager)", "Procurement", ACTION),
+    ("purchase_order:create", "Raise a purchase order from awarded lines", "Procurement", ACTION),
+    ("purchase_order:approve", "Approve an order above the value threshold (Purchase Manager)", "Procurement", ACTION),
+    ("receipt:view", "See expected and recorded goods receipts", "Receipts", VIEW),
+    ("receipt:record", "Record what physically arrived (Store Keeper)", "Receipts", ACTION),
+    ("receipt:verify", "Verify quantity and quality, accepting cost (Site Engineer)", "Receipts", ACTION),
+    ("receipt:return", "Return material to a vendor", "Receipts", ACTION),
     ("admin:manage", "Manage users, roles and project assignments", "Administration", VIEW),
 ]
 
@@ -64,17 +75,28 @@ def unknown(codes) -> set[str]:
 #: something recognisable rather than an empty permissions screen.
 DEFAULT_ROLES: list[tuple[str, str, list[str]]] = [
     ("administrator", "Administrator", sorted(ALL_CODES)),
-    ("director", "Director / Finance", ["dashboard:view", "crm:view", "sales:view", "projects:view", "boq:view"]),
+    ("director", "Director / Finance", ["dashboard:view", "crm:view", "sales:view", "projects:view", "boq:view", "procurement:view", "receipt:view"]),
     ("sales_rep", "Sales Representative", ["crm:view", "sales:view"]),
     ("sales_manager", "Sales Manager", ["crm:view", "sales:view", "order:confirm", "order:approve_kickoff", "dashboard:view"]),
     ("project_manager", "Project Manager", [
         "dashboard:view", "projects:view", "boq:view", "sales:view",
         "project:plan_schedule", "project:extend_schedule", "boq_revision:release",
-        "order:approve_kickoff",
+        "order:approve_kickoff", "procurement:view", "procurement:approve_request",
+        "receipt:view",
     ]),
     ("design_manager", "Design Manager", ["projects:view", "boq:view", "boq:edit", "boq:sign_off"]),
-    ("construction_manager", "Construction Manager", ["projects:view", "boq:view", "boq:edit", "boq:sign_off"]),
-    ("purchase_manager", "Purchase Manager", ["dashboard:view", "projects:view", "boq:view"]),
-    ("procurement_officer", "Procurement Officer", ["projects:view", "boq:view"]),
-    ("site_engineer", "Site Engineer", ["projects:view", "boq:view"]),
+    ("construction_manager", "Construction Manager", ["projects:view", "boq:view", "boq:edit", "boq:sign_off", "procurement:request", "procurement:view"]),
+    ("purchase_manager", "Purchase Manager", [
+        "dashboard:view", "projects:view", "boq:view", "procurement:view", "receipt:view",
+        "procurement:rfq", "procurement:award", "purchase_order:create", "purchase_order:approve",
+    ]),
+    ("procurement_officer", "Procurement Officer", [
+        "projects:view", "boq:view", "procurement:view", "receipt:view",
+        "procurement:rfq", "purchase_order:create",
+    ]),
+    ("store_keeper", "Store / Site Keeper", ["projects:view", "receipt:view", "receipt:record"]),
+    ("site_engineer", "Site Engineer", [
+        "projects:view", "boq:view", "receipt:view", "receipt:verify", "receipt:return",
+        "procurement:request",
+    ]),
 ]

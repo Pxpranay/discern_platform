@@ -1,0 +1,42 @@
+{% extends "ui/base.html" %}{% load money %}
+{% block title %}{{ order.number }} · Discern{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'procurement_home' %}">Procurement</a> / {{ order.number }}</p>
+<h1>{{ order.number }}</h1>
+<p class="sub">{{ order.vendor.name }} · {{ order.project.code }} · {{ order.total_value|rupees }}
+  {% if order.status == 'confirmed' %}<span class="pill ok">confirmed</span>
+  {% elif order.status == 'awaiting_approval' %}<span class="pill warn">awaiting Purchase Manager</span>
+  {% else %}<span class="pill mute">{{ order.get_status_display }}</span>{% endif %}</p>
+
+<div class="card"><h2>Lines</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th><th class="num">Received</th><th class="num">Outstanding</th></tr></thead>
+  <tbody>{% for l in lines %}
+    <tr><td>{{ l.description }}</td><td class="num">{{ l.quantity|qty }} {{ l.uom }}</td>
+      <td class="num">{{ l.rate|rupees }}</td><td class="num">{{ l.amount|rupees }}</td>
+      <td class="num">{{ l.received_qty|qty }}</td>
+      <td class="num">{% if l.outstanding_qty %}<span class="pill warn">{{ l.outstanding_qty|qty }}</span>{% else %}<span class="pill ok">complete</span>{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table></div></div>
+
+<div class="card"><h2>Actions</h2><div class="body">
+{% if order.status == 'draft' %}
+  <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="submit">
+    <button class="btn" type="submit">Submit order</button></form>
+  <p class="sub" style="margin:.75rem 0 0;font-size:.85rem">Above the value threshold this parks for the Purchase Manager rather than confirming.</p>
+{% elif order.status == 'awaiting_approval' %}
+  <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="approve">
+    <button class="btn" type="submit">Approve and confirm</button></form>
+{% else %}
+  <p class="sub" style="margin:0 0 1rem">Confirmed and locked. Receipts are expected at the project site.</p>
+{% endif %}
+
+<form method="post" class="inline" style="margin-top:1rem">{% csrf_token %}<input type="hidden" name="action" value="amend">
+  <div><label>Line</label><select name="line">{% for l in lines %}<option value="{{ l.pk }}">{{ l.description|truncatechars:40 }}</option>{% endfor %}</select></div>
+  <div><label>Reduce to</label><input name="new_qty" style="width:6rem"></div>
+  <div style="flex:1"><label>Reason</label><input name="reason" style="width:100%" placeholder="site revised the run"></div>
+  <button class="btn sec" type="submit">Amend</button>
+</form>
+<p class="sub" style="margin:.6rem 0 0;font-size:.84rem">Reducing a line releases the BOQ headroom it held.</p>
+</div></div>
+{% endblock %}

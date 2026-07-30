@@ -32,6 +32,9 @@ from apps.projects import services as projects
 from apps.projects.models import SchedulePhase
 from apps.projects.services import ScheduleExceedsCommitment
 from apps.sales import services as sales
+from apps.inventory import services as inventory
+from apps.procurement import services as procurement
+from apps.procurement.models import PurchaseOrder, Vendor
 from apps.sales.models import Client, ClientInvoice, Lot, LotKind, Order
 
 FIXTURES = Path(__file__).resolve().parents[4] / "tests" / "fixtures"
@@ -92,8 +95,13 @@ class Command(BaseCommand):
             "sales_mgr": user("sales_manager", ["order:approve_kickoff"]),
             "pm": user("project_manager", ["project:extend_schedule", "boq_revision:release"]),
             "design_mgr": user("design_manager", []),
-            "buyer": user("procurement_officer", []),
-            "site_engineer": user("site_engineer", []),
+            "buyer": user("procurement_officer", ["procurement:rfq", "purchase_order:create"]),
+            "site_engineer": user("site_engineer", ["receipt:verify", "receipt:return"]),
+            "store": user("store_keeper", ["receipt:record"]),
+            "purchase_mgr": user("purchase_manager", [
+                "procurement:rfq", "procurement:award",
+                "purchase_order:create", "purchase_order:approve",
+            ]),
             "admin": AppUser.objects.create(
                 username=f"admin-{stamp}", email="admin@discern.test", is_administrator=True
             ),
@@ -335,8 +343,86 @@ class Command(BaseCommand):
         self.note("One line, two different actions. Comparing documents cannot produce this —")
         self.note("the engine reads the commitment and stock ledgers.")
 
+        # ============================================ 6b. PROCUREMENT
+        self.h1("7.  PROCUREMENT — three vendors, a comparison, a free award")
+
+        pr = project.procurement_requests.order_by("-created_at").first()
+        self.ok(f"{pr.number} raised automatically from the released revision")
+        self.note(f"{pr.lines.count()} line(s) — only what actually changed")
+
+        vendors = [
+            Vendor.objects.get_or_create(name=name, defaults={"is_active": True})[0]
+            for name in ("Steel & Pipes Co", "Kolkata Tubes Pvt Ltd", "Eastern Metals")
+        ]
+        rfq = procurement.create_rfq(request=pr, vendors=vendors, actor=who["buyer"])
+        procurement.issue_rfq(rfq=rfq, actor=who["buyer"])
+        self.ok(f"{rfq.number} issued to {len(vendors)} vendors")
+
+        target = pr.lines.first()
+        for rfq_vendor, rate in zip(rfq.vendors.all(), ["1310", "1180", "1245"]):
+            procurement.record_quote(
+                rfq_vendor=rfq_vendor,
+                quotes=[{"request_line": target, "rate": rate}],
+                actor=who["buyer"],
+            )
+
+        self.h2(f"Comparison statement — {target.description[:44]}")
+        self.row("VENDOR", "RATE", "", widths=(34, 14, 20))
+        row = next(r for r in procurement.comparison(rfq) if r["line"].pk == target.pk)
+        for quote in row["quotes"]:
+            mark = "  ← lowest" if quote["is_best_price"] else ""
+            self.row(quote["vendor"].name, f"₹{quote['rate']:,.0f}", mark, widths=(34, 14, 20))
+
+        self.h2("The Purchase Manager awards — irrespective of price")
+        chosen = row["quotes"][2]["vendor"]
+        award = procurement.award_line(
+            rfq=rfq, request_line=target, vendor=chosen, actor=who["purchase_mgr"],
+            notes="Only vendor able to deliver before the slab pour.",
+        )
+        self.ok(f"Awarded to {chosen.name} at ₹{award.awarded_rate:,.0f}")
+        self.note("Not the lowest quote. No justification is demanded — that was")
+        self.note("stated as the Purchase Manager's prerogative and is honoured.")
+        self.note("The comparison seen at that moment is frozen onto the award.")
+
+        order = procurement.create_purchase_order(awards=[award], actor=who["purchase_mgr"])
+        order.lines.update(item=item)
+        procurement.submit_purchase_order(order=order, actor=who["purchase_mgr"])
+        events.drain()
+        self.ok(f"{order.number} confirmed — {n(award.awarded_qty)} {target.uom} at ₹{award.awarded_rate:,.0f}")
+
+        # ============================================ 6c. RECEIPT
+        self.h1("8.  RECEIPT — nothing becomes cost until it is verified")
+
+        po_line = order.lines.first()
+        receipt = inventory.record_receipt(
+            purchase_order_line=po_line, quantity=Decimal("20"),
+            actor=who["store"], vendor_challan="CH-4471",
+        )
+        self.ok(f"{receipt.number}: Store Keeper recorded 20 {po_line.uom} arriving")
+        self.row("Cost posted so far", f"₹{costing.project_total(project.pk, CostEntry.MATERIAL):,.0f}", widths=(26, 30))
+        self.note("Recorded is not accepted.")
+
+        self.h2("A buyer tries to verify their own delivery")
+        try:
+            inventory.verify_receipt(receipt=receipt, accepted_qty=20, actor=who["buyer"])
+        except DomainError as exc:
+            self.blocked(str(exc))
+
+        self.h2("The Site Engineer verifies — 18 good, 2 dented")
+        inventory.verify_receipt(
+            receipt=receipt, accepted_qty=Decimal("18"), rejected_qty=Decimal("2"),
+            actor=who["site_engineer"], notes="2 Mtr dented in transit",
+        )
+        events.drain()
+        self.ok("Stock and cost posted for the accepted quantity only")
+        self.row("Material cost", f"₹{costing.project_total(project.pk, CostEntry.MATERIAL):,.0f}", widths=(26, 30))
+        self.row("Discrepancy", "2 Mtr — vendor bill held", widths=(26, 30))
+        self.row("Headroom now", f"{n(headroom(po_line.boq_line_id))} {po_line.uom} — 2 of it freed by the rejection", widths=(26, 44))
+        self.note("The rejected quantity frees its BOQ headroom, so the replacement")
+        self.note("can be ordered without a revision.")
+
         # ================================================== 7. COSTING
-        self.h1("7.  COST LEDGER — margin per project and per SITC lot")
+        self.h1("9.  COST LEDGER — margin per project and per SITC lot")
 
         costing.post_cost(
             project_id=project.pk, lot_id=fire.pk, category=CostEntry.MATERIAL,
@@ -382,7 +468,7 @@ class Command(BaseCommand):
         self.note("Lot 2's thin margin is invisible in the blended project figure.")
 
         # ================================================== 8. GOVERNANCE
-        self.h1("8.  GOVERNANCE & AUDIT")
+        self.h1("10.  GOVERNANCE & AUDIT")
 
         self.h2("Administrator override of a locked record")
         from apps.platform_core.models import AdminOverride, Override

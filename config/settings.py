@@ -23,6 +23,8 @@ INSTALLED_APPS = [
     "apps.sales",
     "apps.projects",
     "apps.engineering",
+    "apps.procurement",
+    "apps.inventory",
     "apps.ui",
 ]
 

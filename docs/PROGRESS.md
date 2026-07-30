@@ -10,8 +10,8 @@ with every commit.
 
 | | |
 |---|---|
-| **Built** | Phases 0, 1, 2 + web app + admin/RBAC |
-| **Tests** | 145 passing against real PostgreSQL, order-independent |
+| **Built** | Phases 0, 1, 2, 3 + web app + admin/RBAC |
+| **Tests** | 192 passing against real PostgreSQL, order-independent |
 | **Stack** | PostgreSQL 16 · Django 5 · server-rendered templates. Supabase move still open |
 | **Login** | `demo` / `discern2026` (`make seed` then `make run`) |
 | **Push** | Blocked — session GitHub token is read-only. Work is delivered as `git am` patches |
@@ -36,19 +36,29 @@ with every commit.
   Projects, BOQ. Every button calls a domain service.
 - **Admin / RBAC.** Users, roles, capability matrix, project assignments.
   Views and nav gated by capability.
+- **Phase 3 — Procurement and receipt.** Vendors and agreed rates; one
+  `ProcurementRequest` for all three sources; cross-location stock availability
+  and last purchase price before any RFQ; RFQ to ≥3 vendors with a recorded
+  waiver where three is impossible; comparison statement marking best price as
+  information only; fully discretionary award with the comparison frozen onto
+  it; purchase orders consuming the BOQ ceiling, parked above a value
+  threshold; goods receipt, **Site Engineer verification before cost is
+  accepted**, discrepancies holding the vendor bill, and returns that release
+  headroom so material can be re-ordered.
 
 ## Next
 
-**Phase 3 — Procurement and receipt.** Vendors and agreed rates; procurement
-requests from all three sources (BOQ release, site requisition, fabrication
-shortfall); cross-location stock availability before any RFQ; RFQ to ≥3 vendors
-with a recorded waiver where three is impossible; comparison statement; the
-Purchase Manager's fully discretionary award; purchase orders checked against
-the ceiling; goods receipt with **Site Engineer verification before cost is
-accepted**; discrepancies, debit notes and returns.
+**Phase 4 — Fabrication and subcontracts.** Bills of materials and fabrication
+orders (in-house and job-work); raw-material shortfall raising child
+procurement requests; service orders direct to empanelled subcontractors with
+progress logging and running-bill certification; site expenses; dead/excess
+stock flagging with inter-project transfer and paired cost entries.
 
-Then Phase 4 (fabrication, subcontracts, site expenses, dead stock) and
-Phase 5 (dashboards, mobile site screens).
+Then Phase 5: dashboards and the mobile site screens.
+
+Blocking decisions that Phase 4 needs answered: **#3** (in-house vs job-work
+fabrication) and **#4** (transfer valuation basis). I will build both to the
+recommended defaults unless told otherwise, as with #1 and #2.
 
 ## Decisions taken
 
@@ -59,6 +69,7 @@ Phase 5 (dashboards, mobile site screens).
 | — | Server-rendered templates, not React, to keep the stack decision open | `apps/ui/` |
 | — | Append-only via DB trigger rather than revoked grants (superusers bypass grants) | `platform_core/migrations/0002` |
 | — | Removal is a property of a change, not a sixth reconciliation outcome | `engineering/reconciliation.py` |
+| — | "Needs approval" is a returned state, not a raised exception — raising rolled back the state change that reported it | `procurement/services.submit_purchase_order` |
 
 ## Open questions
 

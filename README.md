@@ -6,7 +6,7 @@ Integrated operations platform for Discern Engineering Pvt Ltd — a purpose-bui
 Enquiry → Sales → Project → BOQ → Procurement → Fabrication / Subcontract → Receipt → Costing
 ```
 
-**Status: working application covering Phases 0–2, with role-based administration. 152 tests passing. Sign in with `demo` / `discern2026`.**
+**Status: working application covering Phases 0–3, with role-based administration. 192 tests passing. Sign in with `demo` / `discern2026`.**
 
 ---
 
@@ -74,7 +74,7 @@ make seed                      # demo login + a worked project from the real BOQ
 make run                       # http://localhost:8000  —  demo / discern2026
 ```
 
-Other targets: `make test` (152 tests), `make test-ceiling` (just the
+Other targets: `make test` (192 tests), `make test-ceiling` (just the
 invariant the design rests on), `make demo` (terminal walkthrough).
 
 ### Screens
@@ -86,6 +86,8 @@ invariant the design rests on), `make demo` (terminal walkthrough).
 | **Sales** | Orders and lots; confirm an order, approve it for kickoff |
 | **Projects** | Margin by SITC lot, cost by category, master schedule, record an extension, open the next BOQ revision |
 | **BOQ** | Both sections with live committed/headroom per line, add lines, sign off, mark not applicable, release, send back, and the reconciliation verdicts |
+| **Procurement** | Requests from all three sources, stock held elsewhere, RFQs, the comparison statement, discretionary award, purchase orders |
+| **Receipts** | What is awaited, what the Store Keeper recorded, Site Engineer verification, discrepancies and returns |
 | **Admin** | Users, roles, a capability matrix, project assignments, and the Administrator override log |
 
 ### Who can see what

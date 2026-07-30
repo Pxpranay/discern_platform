@@ -83,6 +83,8 @@ input:focus,select:focus,textarea:focus,button:focus{outline:2px solid var(--cya
     {% if user|can:"sales:view" %}<a href="{% url 'orders' %}" class="{% if nav == 'sales' %}on{% endif %}">Sales</a>{% endif %}
     {% if user|can:"projects:view" %}<a href="{% url 'projects' %}" class="{% if nav == 'projects' %}on{% endif %}">Projects</a>{% endif %}
     {% if user|can:"boq:view" %}<a href="{% url 'boq_list' %}" class="{% if nav == 'boq' %}on{% endif %}">BOQ</a>{% endif %}
+    {% if user|can:"procurement:view" %}<a href="{% url 'procurement_home' %}" class="{% if nav == 'procurement' %}on{% endif %}">Procurement</a>{% endif %}
+    {% if user|can:"receipt:view" %}<a href="{% url 'receipts' %}" class="{% if nav == 'receipts' %}on{% endif %}">Receipts</a>{% endif %}
     {% if user|can:"admin:manage" %}<a href="{% url 'admin_home' %}" class="{% if nav == 'admin' %}on{% endif %}">Admin</a>{% endif %}
   </nav>
   <div class="who">

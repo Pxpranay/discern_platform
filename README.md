@@ -64,23 +64,32 @@ Nine **structural** things changed, because building from scratch removes the co
 
 ## Running it
 
-Requires Docker Desktop and nothing else — no Python, no PostgreSQL, no Redis
-installed on your machine.
+**With Docker** — nothing else installed on your machine:
 
 ```bash
 make up          # http://localhost:8000  —  demo / discern2026
 ```
 
-That builds the images, starts PostgreSQL and Redis, migrates the schema, seeds
-the twelve roles and the demo login, and loads a worked project from Discern's
-real LINAC Building BOQ files. First run takes a few minutes; later runs start
-in seconds.
+**Without Docker** — if Docker Desktop reports *"virtualization support not
+detected"*, or you would rather not run a VM. Needs Python 3.12 and PostgreSQL
+16; Redis is not required.
 
-`make up` is safe to repeat. The demo project is loaded **only when the database
-has no project yet**, so restarting never overwrites data you have entered. To
-start clean, `make reset` (deletes the database volume) then `make up`.
+```bash
+cp .env.example .env          # set POSTGRES_HOST=127.0.0.1 and your password
+pip install -r requirements.txt
+python manage.py bootstrap    # creates the database, migrates, seeds, loads the demo
+python manage.py runserver 0.0.0.0:8000
+```
 
-`make down` stops the stack and keeps the data.
+Either route creates the schema, seeds the twelve roles and the demo login, and
+loads a worked project from Discern's real LINAC Building BOQ files.
+
+Both are safe to repeat. The demo project is loaded **only when the database has
+no project yet**, so restarting never overwrites data you have entered. To start
+clean under Docker, `make reset` then `make up`; without Docker, drop the
+database and re-run `bootstrap`.
+
+`make down` stops the Docker stack and keeps the data.
 
 Step-by-step instructions, including the no-Docker route and what to click once
 you are in, are in [`docs/RUNNING.md`](docs/RUNNING.md).

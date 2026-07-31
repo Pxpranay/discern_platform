@@ -6,6 +6,33 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def _load_dotenv(path: Path) -> None:
+    """Read `.env` into the environment for anyone running without Docker.
+
+    Docker passes these as real environment variables via `env_file`, so this
+    is a no-op there — and deliberately so: **a real environment variable
+    always wins**. Otherwise a stale `.env` in the working tree would silently
+    override what the container was configured with.
+
+    Without this, editing `.env` outside Docker does nothing at all, and the
+    app goes looking for a host called `db` that only exists inside compose.
+    """
+    if not path.is_file():
+        return
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_dotenv(BASE_DIR / ".env")
+
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-only-not-for-production")
 DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
@@ -93,6 +120,11 @@ LOGOUT_REDIRECT_URL = "/login/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # --- Celery ---------------------------------------------------------------
+# Redis is only needed for the background outbox drain. Nothing in a web
+# request calls `.delay()`, so the application runs perfectly well with no
+# Redis at all — you simply drain the outbox yourself (`manage.py drain_outbox`)
+# instead of a worker doing it on a schedule. That makes Redis optional for
+# anyone running this locally without Docker.
 REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
